@@ -53,4 +53,5 @@ enum class ModeReason : uint8_t {
   UNAVAILABLE,
   AUTOROTATION_START,
   AUTOROTATION_BAILOUT,
+  MODE_REASON_MISSION_END, /*DrawStar finished Reason*/
 };

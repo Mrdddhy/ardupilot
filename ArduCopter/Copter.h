@@ -224,6 +224,7 @@ public:
     friend class ModeFlowHold;
     friend class ModeFollow;
     friend class ModeGuided;
+    friend class ModeDrawStar;
     friend class ModeLand;
     friend class ModeLoiter;
     friend class ModePosHold;
@@ -952,6 +953,8 @@ private:
     ModeGuided mode_guided;
 #endif
     ModeLand mode_land;
+    ModeDrawStar mode_drawstar;  
+    
 #if MODE_LOITER_ENABLED == ENABLED
     ModeLoiter mode_loiter;
 #endif
