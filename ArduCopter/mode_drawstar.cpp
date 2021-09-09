@@ -2,14 +2,18 @@
 
 #if MODE_DRAWSTAR_ENABLED == ENABLED
 
-// guided_init - initialise guided controller
+/*五角星航线模式初始化，即通过地面站或遥控器设置切换到五角星航线模式后，会先进行对应初始化
+  初始化航线对应的点，然后进入位置控制的初始化过程
+*/
 bool ModeDrawStar::init(bool ignore_checks)
 {
     
     if(copter.position_ok() || ignore_checks){
      auto_yaw.set_mode_to_default(false);
-      //genertate star_path
+      
+      /*初始化路径点当前数目*/
       path_num = 0;
+      /*生成路径点*/
       generate_path();
      
       // start in position control mode
@@ -21,11 +25,16 @@ bool ModeDrawStar::init(bool ignore_checks)
    
 }
 
+/*五角星航线模式生成路线*/
 void ModeDrawStar::generate_path()
 {
+  /*五角星内切圆的半径值*/
   float radius_cm = 1000.0;
-  wp_nav->get_wp_stopping_point(path[0]);
 
+  /*导航库获取第一个停止点，即0号点，这里是在模式发生切换前的该点*/
+  wp_nav->get_wp_stopping_point(path[0]);  
+
+  /*在0号点的基础上生成其他点的坐标*/
   path[1] = path[0] + Vector3f(1.0f,0,0)*radius_cm;
   path[2] = path[0] + Vector3f(-cosf(radians(36.0f)),-sinf((radians(36.0f))),0)*radius_cm;
   path[3] = path[0] + Vector3f(sinf(radians(18.0f)),cosf((radians(18.0f))),0)*radius_cm;
@@ -35,7 +44,7 @@ void ModeDrawStar::generate_path()
 
 }
 
-// initialise guided mode's position controller
+// initialise drawstar mode's position controller
 void ModeDrawStar::pos_control_start()
 {
     // initialise waypoint and spline controller
@@ -50,19 +59,22 @@ void ModeDrawStar::pos_control_start()
 
 // guided_run - runs the guided controller
 // should be called at 100hz or more
+/*这里在fast_loop里被update_flight_mode 以400Hz的频率调用*/
 void ModeDrawStar::run()
 {
+  /*判断是否到达对应的路径点，同时是否完成对应路径点飞行，如果完成，切换进入LOITER模式*/
   if (path_num < 6){
+     /*判断是否到达对应的路径点，然后设置下一路径点*/
     if (wp_nav->reached_wp_destination()){
       path_num++;
       wp_nav->set_wp_destination(path[path_num], false);
     }
-  }
+  } /*判断飞行是否完成，然后切换模式*/
   else if ((path_num == 6) && wp_nav->reached_wp_destination()){
     gcs().send_text(MAV_SEVERITY_CRITICAL,"Draw star finished,now go into Loiter Mode.");
     copter.set_mode(Mode::Number::LOITER,ModeReason::MODE_REASON_MISSION_END);
   }
-   
+   /*开启位置控制模式飞行*/
   pos_control_run();
 }
 

@@ -76,7 +76,7 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
             
         case Mode::Number::DRAWSTAR:
-            ret = &mode_drawstar;
+            ret = &mode_drawstar;  /*编号27对应的模式为五角星航线模式*/
             break;
 
 #if MODE_RTL_ENABLED == ENABLED
