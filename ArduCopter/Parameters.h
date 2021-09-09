@@ -620,6 +620,8 @@ public:
     // Autonmous autorotation
     AC_Autorotation arot;
 #endif
+    AP_Int16 star_radius_cm;
+
 };
 
 extern const AP_Param::Info        var_info[];

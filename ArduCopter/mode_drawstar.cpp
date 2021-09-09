@@ -29,7 +29,7 @@ bool ModeDrawStar::init(bool ignore_checks)
 void ModeDrawStar::generate_path()
 {
   /*五角星内切圆的半径值*/
-  float radius_cm = 1000.0;
+  float radius_cm = g2.star_radius_cm;
 
   /*导航库获取第一个停止点，即0号点，这里是在模式发生切换前的该点*/
   wp_nav->get_wp_stopping_point(path[0]);  
