@@ -961,7 +961,8 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(arot, "AROT_", 37, ParametersG2, AC_Autorotation),
 #endif
 
-   AP_GROUPINFO("STAR_R_CM", 38, ParametersG2, star_radius_cm, 0),
+   /*添加参数时注意初始化对应的数值，这里初始化五角星航线模式的半径值为1000*/
+   AP_GROUPINFO("STAR_R_CM", 38, ParametersG2, star_radius_cm, 1000),
 
 
     AP_GROUPEND
