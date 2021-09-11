@@ -180,7 +180,7 @@ public:
         CAM_MODE_TOGGLE =    102, // Momentary switch to cycle camera modes
         // if you add something here, make sure to update the documentation of the parameter in RC_Channel.cpp!
         // also, if you add an option >255, you will need to fix duplicate_options_exist
-
+        SAVE_USER_WP    =    103,  //设置对应的通道，并在地面站里修改对应的通道参数
         // inputs eventually used to replace RCMAP
         MAINSAIL =           207, // mainsail input
     };

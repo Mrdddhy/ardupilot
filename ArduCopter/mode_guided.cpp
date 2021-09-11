@@ -81,15 +81,20 @@ void ModeGuided::pos_control_start()
     guided_mode = Guided_WP;
 
     // initialise waypoint and spline controller
-    wp_nav->wp_and_spline_init();
+    wp_nav->wp_and_spline_init();/*初始化导航库*/
 
     // initialise wpnav to stopping point
-    Vector3f stopping_point;
-    wp_nav->get_wp_stopping_point(stopping_point);
+
+//    Vector3f stopping_point;
+//    wp_nav->get_wp_stopping_point(stopping_point);
 
     // no need to check return status because terrain data is not used
-    wp_nav->set_wp_destination(stopping_point, false);
+     
+     /*初始化最后一个点,下标为19*/
+     wp_nav->set_wp_destination(copter.user_waypoint[copter.current_user_waypoint_num - 1], false);
 
+     /*减一下，在run里面检测完成后设置*/
+     copter.current_user_waypoint_num --;
     // initialise yaw
     auto_yaw.set_mode_to_default(false);
 }
@@ -419,6 +424,17 @@ void Mode::auto_takeoff_run()
 // called from guided_run
 void ModeGuided::pos_control_run()
 {
+
+        if (wp_nav->reached_wp_destination())
+        {
+            if (copter.current_user_waypoint_num - 1 >= 0)
+            {
+                wp_nav->set_wp_destination(copter.user_waypoint[copter.current_user_waypoint_num -1],false);
+                copter.current_user_waypoint_num --;
+            }
+            
+        }
+        
     // process pilot's yaw input
     float target_yaw_rate = 0;
     if (!copter.failsafe.radio) {

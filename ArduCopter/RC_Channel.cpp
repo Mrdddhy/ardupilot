@@ -579,6 +579,14 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
             }
             break;
 
+        case AUX_FUNC::SAVE_USER_WP:
+            if (ch_flag == HIGH)               /*如果通道切到对应的高位，则保存用户的路径点*/
+            {
+                copter.save_user_waypoint();
+            }
+            break;
+            
+    /*以上case都是多旋翼特有的通道功能，若上面没有扫描对应通道定义，则扫描调用库里面共有的通道功能*/
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);
         break;

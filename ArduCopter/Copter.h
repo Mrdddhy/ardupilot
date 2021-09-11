@@ -913,6 +913,10 @@ private:
     void userhook_auxSwitch2(uint8_t ch_flag);
     void userhook_auxSwitch3(uint8_t ch_flag);
 
+    Vector3f user_waypoint[20];/*用于保存用户的路径点数目*/
+    int current_user_waypoint_num;/*当前路径点,数组下标*/
+    void save_user_waypoint();/*保存路径点函数*/
+
 #if OSD_ENABLED == ENABLED
     void publish_osd_info();
 #endif

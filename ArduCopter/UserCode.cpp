@@ -59,3 +59,17 @@ void Copter::userhook_auxSwitch3(uint8_t ch_flag)
     // put your aux switch #3 handler here (CHx_OPT = 49)
 }
 #endif
+
+/*保存路径点的实现*/
+void Copter::save_user_waypoint()
+{
+    if (copter.current_user_waypoint_num < 20){
+        user_waypoint[current_user_waypoint_num] = inertial_nav.get_position();
+        copter.current_user_waypoint_num ++;  /*记录完成后current_user_waypoint_num = 20*/
+        gcs().send_text(MAV_SEVERITY_CRITICAL,"Waypoint saved!");
+    }else{
+        gcs().send_text(MAV_SEVERITY_CRITICAL,"To many waypoints!");
+    }
+    
+}
+
