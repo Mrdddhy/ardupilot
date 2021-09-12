@@ -69,11 +69,12 @@ Scheduler::Scheduler()
 
 void Scheduler::init()
 {
-    chBSemObjectInit(&_timer_semaphore, false);
-    chBSemObjectInit(&_io_semaphore, false);
+    chBSemObjectInit(&_timer_semaphore, false);/*创建定时器信号量*/
+    chBSemObjectInit(&_io_semaphore, false);/*创建io信号量*/
 
 #ifndef HAL_NO_MONITOR_THREAD
-    // setup the monitor thread - this is used to detect software lockups
+    // setup the monitor thread - this is used to detect software lockups 
+    //设置监视器线程，用于软件锁仓？
     _monitor_thread_ctx = chThdCreateStatic(_monitor_thread_wa,
                      sizeof(_monitor_thread_wa),
                      APM_MONITOR_PRIORITY,        /* Initial priority.    */
@@ -83,6 +84,7 @@ void Scheduler::init()
 
 #ifndef HAL_NO_TIMER_THREAD
     // setup the timer thread - this will call tasks at 1kHz
+    //设置定时器线程，这将调用1Khz的任务
     _timer_thread_ctx = chThdCreateStatic(_timer_thread_wa,
                      sizeof(_timer_thread_wa),
                      APM_TIMER_PRIORITY,        /* Initial priority.    */
@@ -92,6 +94,7 @@ void Scheduler::init()
 
 #ifndef HAL_NO_RCIN_THREAD
     // setup the RCIN thread - this will call tasks at 1kHz
+    // 设置RCIN线程-这将调用1Khz的任务
     _rcin_thread_ctx = chThdCreateStatic(_rcin_thread_wa,
                      sizeof(_rcin_thread_wa),
                      APM_RCIN_PRIORITY,        /* Initial priority.    */
@@ -100,6 +103,7 @@ void Scheduler::init()
 #endif
 #ifndef HAL_USE_EMPTY_IO
     // the IO thread runs at lower priority
+    // IO线程以较低优先级运行
     _io_thread_ctx = chThdCreateStatic(_io_thread_wa,
                      sizeof(_io_thread_wa),
                      APM_IO_PRIORITY,        /* Initial priority.      */
@@ -109,6 +113,7 @@ void Scheduler::init()
 
 #ifndef HAL_USE_EMPTY_STORAGE
     // the storage thread runs at just above IO priority
+    // 存储线程以略高于IO优先级的方式运行
     _storage_thread_ctx = chThdCreateStatic(_storage_thread_wa,
                      sizeof(_storage_thread_wa),
                      APM_STORAGE_PRIORITY,        /* Initial priority.      */

@@ -95,17 +95,17 @@ AP_Scheduler *AP_Scheduler::get_singleton()
 // initialise the scheduler
 void AP_Scheduler::init(const AP_Scheduler::Task *tasks, uint8_t num_tasks, uint32_t log_performance_bit)
 {
-    _tasks = tasks;
-    _num_tasks = num_tasks;
+    _tasks = tasks;/*任务指针*/
+    _num_tasks = num_tasks;/*总共的任务数*/
     _last_run = new uint16_t[_num_tasks];
-    memset(_last_run, 0, sizeof(_last_run[0]) * _num_tasks);
+    memset(_last_run, 0, sizeof(_last_run[0]) * _num_tasks);/*最后运行赋值为0*/
     _tick_counter = 0;
 
     // setup initial performance counters
-    perf_info.set_loop_rate(get_loop_rate_hz());
+    perf_info.set_loop_rate(get_loop_rate_hz());/*初始化执行计数*/
     perf_info.reset();
 
-    _log_performance_bit = log_performance_bit;
+    _log_performance_bit = log_performance_bit;/*log执行位*/
 }
 
 // one tick has passed
@@ -132,9 +132,10 @@ static void fill_nanf_stack(void)
  */
 void AP_Scheduler::run(uint32_t time_available)
 {
-    uint32_t run_started_usec = AP_HAL::micros();
-    uint32_t now = run_started_usec;
+    uint32_t run_started_usec = AP_HAL::micros();/*记录开始时间是多少us*/
+    uint32_t now = run_started_usec;/*把数据传递给now*/
 
+   /*执行调试代码*/
     if (_debug > 1 && _perf_counters == nullptr) {
         _perf_counters = new AP_HAL::Util::perf_counter_t[_num_tasks];
         if (_perf_counters != nullptr) {
@@ -143,22 +144,26 @@ void AP_Scheduler::run(uint32_t time_available)
             }
         }
     }
-    
+    /*循环执行任务*/
     for (uint8_t i=0; i<_num_tasks; i++) {
-        uint32_t dt = _tick_counter - _last_run[i];
-        uint32_t interval_ticks = _loop_rate_hz / _tasks[i].rate_hz;
+        uint32_t dt = _tick_counter - _last_run[i];/*获取单个任务的时间*/
+        uint32_t interval_ticks = _loop_rate_hz / _tasks[i].rate_hz;/*间隔时间，主循环时间/任务时间一定要大于1*/
         if (interval_ticks < 1) {
-            interval_ticks = 1;
+            interval_ticks = 1;  /*小于1被限制等于*/
         }
+        /*一般不会存在*/
         if (dt < interval_ticks) {
-            // this task is not yet scheduled to run again
+            // this task is not yet scheduled to run again 
             continue;
         }
         // this task is due to run. Do we have enough time to run it?
+        // 此任务将运行，我们有足够的时间跑吗
         _task_time_allowed = _tasks[i].max_time_micros;
-
+        
+        /*时间不应该超过这个值*/
         if (dt >= interval_ticks*2) {
             // we've slipped a whole run of this task!
+            // 我们把这项任务搞砸了
             debug(2, "Scheduler slip task[%u-%s] (%u/%u/%u)\n",
                   (unsigned)i,
                   _tasks[i].name,
@@ -166,7 +171,7 @@ void AP_Scheduler::run(uint32_t time_available)
                   (unsigned)interval_ticks,
                   (unsigned)_task_time_allowed);
         }
-
+        /*可能还有其他的任务可以满足，因此for循环还是会继续*/
         if (dt >= interval_ticks*max_task_slowdown) {
             // we are going beyond the maximum slowdown factor for a
             // task. This will trigger increasing the time budget
@@ -176,14 +181,17 @@ void AP_Scheduler::run(uint32_t time_available)
         if (_task_time_allowed > time_available) {
             // not enough time to run this task.  Continue loop -
             // maybe another task will fit into time remaining
+            // 没有足够的时间运行此任务，继续循环
+            // 也许剩下的时间里会有另一项任务
             continue;
         }
 
         // run it
+        //开始运行它
         _task_time_started = now;
-        hal.util->persistent_data.scheduler_task = i;
+        hal.util->persistent_data.scheduler_task = i;/*当前运行的是哪个任务*/
         if (_debug > 1 && _perf_counters && _perf_counters[i]) {
-            hal.util->perf_begin(_perf_counters[i]);
+            hal.util->perf_begin(_perf_counters[i]); /*调试信息*/
         }
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         fill_nanf_stack();
@@ -192,16 +200,19 @@ void AP_Scheduler::run(uint32_t time_available)
         if (_debug > 1 && _perf_counters && _perf_counters[i]) {
             hal.util->perf_end(_perf_counters[i]);
         }
-        hal.util->persistent_data.scheduler_task = -1;
+        hal.util->persistent_data.scheduler_task = -1; /*当前任务赋值-1*/
 
         // record the tick counter when we ran. This drives
         // when we next run the event
+        // 我们跑的时候记录下滴答计数器，当我们下次跑的时候会驱动
         _last_run[i] = _tick_counter;
 
         // work out how long the event actually took
+        // 算出这件事实际花了多长时间
         now = AP_HAL::micros();
-        uint32_t time_taken = now - _task_time_started;
-
+        uint32_t time_taken = now - _task_time_started;/*计算两次时间差*/
+         
+         /*判断是否超时*/
         if (time_taken > _task_time_allowed) {
             // the event overran!
             debug(3, "Scheduler overrun task[%u-%s] (%u/%u)\n",
@@ -210,10 +221,12 @@ void AP_Scheduler::run(uint32_t time_available)
                   (unsigned)time_taken,
                   (unsigned)_task_time_allowed);
         }
+        /*如果超时了，记录现在可以使用的时间是0*/
         if (time_taken >= time_available) {
             time_available = 0;
             break;
         }
+        /*否则就把有效时间继续减少*/
         time_available -= time_taken;
     }
 
@@ -254,21 +267,21 @@ float AP_Scheduler::load_average()
 
 void AP_Scheduler::loop()
 {
-    // wait for an INS sample
+    // 等待INS采样频率---wait for an INS sample
     hal.util->persistent_data.scheduler_task = -3;
-    AP::ins().wait_for_sample();
+    AP::ins().wait_for_sample();/*获取采样时间*/
     hal.util->persistent_data.scheduler_task = -1;
 
     const uint32_t sample_time_us = AP_HAL::micros();
-    
+    /*循环计数开始时间等于多少us*/
     if (_loop_timer_start_us == 0) {
         _loop_timer_start_us = sample_time_us;
         _last_loop_time_s = get_loop_period_s();
     } else {
-        _last_loop_time_s = (sample_time_us - _loop_timer_start_us) * 1.0e-6;
+        _last_loop_time_s = (sample_time_us - _loop_timer_start_us) * 1.0e-6;/*两次时间差*/
     }
 
-    // Execute the fast loop
+    //执行快速循环任务 Execute the fast loop
     // ---------------------
     if (_fastloop_fn) {
         hal.util->persistent_data.scheduler_task = -2;
@@ -288,7 +301,7 @@ void AP_Scheduler::loop()
 #endif
 
     // tell the scheduler one tick has passed
-    tick();
+    tick();/*告诉任务调度器一个时钟节拍已经过去*/
 
     // run all the tasks that are due to run. Note that we only
     // have to call this once per loop, as the tasks are scheduled

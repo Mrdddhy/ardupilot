@@ -171,25 +171,30 @@ static void main_loop()
 #ifdef HAL_I2C_CLEAR_BUS
     // Clear all I2C Buses. This can be needed on some boards which
     // can get a stuck I2C peripheral on boot
+    //清除所有I2C总线，这可能需要在一些板子上
+    //启动时会出现I2C外设卡滞
     ChibiOS::I2CBus::clear_all();
 #endif
 
-    ChibiOS::Shared_DMA::init();
-    peripheral_power_enable();
+    ChibiOS::Shared_DMA::init();/*DMA配置*/
+    peripheral_power_enable();/*Power使能*/
 
-    hal.uartA->begin(115200);
+    hal.uartA->begin(115200);/*使能USB*/
 
 #ifdef HAL_SPI_CHECK_CLOCK_FREQ
     // optional test of SPI clock frequencies
+    //SPI时钟频率的可选测试
     ChibiOS::SPIDevice::test_clock_freq();
 #endif
 
     hal.uartB->begin(38400);
     hal.uartC->begin(57600);
-    hal.analogin->init();
-    hal.scheduler->init();
+    hal.analogin->init();  /*模拟端口初始化*/
+    
+    hal.scheduler->init();/*任务调度初始化*/
 
     /*
+    * 以低优先级运行setup()以确保CLI不会挂起系统，并允许初始传感器读取回路运行
       run setup() at low priority to ensure CLI doesn't hang the
       system, and to allow initial sensor read loops to run
      */
@@ -200,9 +205,9 @@ static void main_loop()
         stm32_watchdog_load((uint32_t *)&utilInstance.persistent_data, (sizeof(utilInstance.persistent_data)+3)/4);
         utilInstance.last_persistent_data = utilInstance.persistent_data;
     }
-
+    /*初始化hal*/
     schedulerInstance.hal_initialized();
-
+    /*回调setup函数*/
     g_callbacks->setup();
 
 #ifdef IOMCU_FW
@@ -228,6 +233,7 @@ static void main_loop()
     chRegSetThreadName(SKETCHNAME);
 
     /*
+      *切换到主回路的高优先级
       switch to high priority for main loop
      */
     chThdSetPriority(APM_MAIN_PRIORITY);
@@ -242,6 +248,8 @@ static void main_loop()
           delay_microseconds_boost() means we have already given up
           time from the main loop, so we don't need to do it again
           here
+          如果IMS循环周期没有调用delay_microseconds_boost函数，放弃250us时间，确保低优先级的驱动能正常运转，
+          调用deley_microseconds_boost意味着我们已经放弃主循环时间，因此我们不需要再做
          */
 #ifndef HAL_DISABLE_LOOP_DELAY
         if (!schedulerInstance.check_called_boost()) {
@@ -256,17 +264,21 @@ static void main_loop()
 void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
 {
     /*
+     *系统初始化
+     *Chibios HAL初始化，也初始化配置设备驱动和执行特殊板层初始化
+     *内核初始化，main()函数成为一个主线程且实时操作系统被激活
      * System initializations.
      * - ChibiOS HAL initialization, this also initializes the configured device drivers
      *   and performs the board-specific initializations.
      * - Kernel initialization, the main() function becomes a thread and the
      *   RTOS is active.
      */
-
+/*初始化USB*/
 #if HAL_USE_SERIAL_USB == TRUE
     usb_initialise();
 #endif
 
+/*配置串口标准输出*/
 #ifdef HAL_STDOUT_SERIAL
     //STDOUT Initialistion
     SerialConfig stdoutcfg =
@@ -279,11 +291,11 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
     sdStart((SerialDriver*)&HAL_STDOUT_SERIAL, &stdoutcfg);
 #endif
 
-    assert(callbacks);
-    g_callbacks = callbacks;
+    assert(callbacks);/*断言回调函数*/
+    g_callbacks = callbacks;/*赋值回调函数*/
 
     //Takeover main
-    main_loop();
+    main_loop();/*执行main_loop函数*/
 }
 
 const AP_HAL::HAL& AP_HAL::get_HAL() {

@@ -87,17 +87,18 @@ const AP_HAL::HAL& hal = AP_HAL::get_HAL();
   scheduler table for fast CPUs - all regular tasks apart from the fast_loop()
   should be listed here, along with how often they should be called (in hz)
   and the maximum time they are expected to take (in microseconds)
+  任务列表数组
  */
 const AP_Scheduler::Task Copter::scheduler_tasks[] = {
-    SCHED_TASK(rc_loop,              100,    130),
-    SCHED_TASK(throttle_loop,         50,     75),
-    SCHED_TASK(update_GPS,            50,    200),
+    SCHED_TASK(rc_loop,              100,    130),//读取遥控器
+    SCHED_TASK(throttle_loop,         50,     75),//更新油门值
+    SCHED_TASK(update_GPS,            50,    200),//更新GPS数据
 #if OPTFLOW == ENABLED
-    SCHED_TASK_CLASS(OpticalFlow,          &copter.optflow,             update,         200, 160),
+    SCHED_TASK_CLASS(OpticalFlow,          &copter.optflow,             update,         200, 160),//更新光流数据
 #endif
-    SCHED_TASK(update_batt_compass,   10,    120),
-    SCHED_TASK_CLASS(RC_Channels,          (RC_Channels*)&copter.g2.rc_channels,      read_aux_all,    10,     50),
-    SCHED_TASK(arm_motors_check,      10,     50),
+    SCHED_TASK(update_batt_compass,   10,    120),//更新电池和罗盘数据
+    SCHED_TASK_CLASS(RC_Channels,          (RC_Channels*)&copter.g2.rc_channels,      read_aux_all,    10,     50),//读取外部开关通道
+    SCHED_TASK(arm_motors_check,      10,     50),//电机解锁函数
 #if TOY_MODE_ENABLED == ENABLED
     SCHED_TASK_CLASS(ToyMode,              &copter.g2.toy_mode,         update,          10,  50),
 #endif
@@ -219,6 +220,7 @@ void Copter::setup()
     init_ardupilot();
 
     // initialise the main loop scheduler
+    //scheduler 为AP_Scheduler的一个对象
     scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);
 }
 
@@ -621,4 +623,5 @@ Copter::Copter(void)
 
 Copter copter;
 
+/*Copter主程序入口*/
 AP_HAL_MAIN_CALLBACKS(&copter);

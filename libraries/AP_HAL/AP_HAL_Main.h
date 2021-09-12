@@ -32,6 +32,16 @@
     } \
     }
 
+/*主函数声明并且主函数实现
+CALLBACKS = &copter
+即：
+int main(int argc,char * const argv[])
+{
+    hal.run(argc, argv, CALLBACKS);  //根据不同的板层调用不同的设备run函数实现
+    return 0; 
+}
+//以采用Chibios系统为例
+*/
 #define AP_HAL_MAIN_CALLBACKS(CALLBACKS) extern "C" { \
     int AP_MAIN(int argc, char* const argv[]); \
     int AP_MAIN(int argc, char* const argv[]) { \
