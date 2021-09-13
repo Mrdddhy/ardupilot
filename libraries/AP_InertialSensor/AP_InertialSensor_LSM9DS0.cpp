@@ -761,8 +761,8 @@ void AP_InertialSensor_LSM9DS0::_read_data_transaction_g()
 
 bool AP_InertialSensor_LSM9DS0::update()
 {
-    update_gyro(_gyro_instance);
-    update_accel(_accel_instance);
+    update_gyro(_gyro_instance);//更新加速度数据
+    update_accel(_accel_instance);//更新陀螺仪数据
 
     return true;
 }

@@ -97,7 +97,7 @@ void AP_Scheduler::init(const AP_Scheduler::Task *tasks, uint8_t num_tasks, uint
 {
     _tasks = tasks;/*任务指针*/
     _num_tasks = num_tasks;/*总共的任务数*/
-    _last_run = new uint16_t[_num_tasks];
+    _last_run = new uint16_t[_num_tasks];/*最后运行的任务*/
     memset(_last_run, 0, sizeof(_last_run[0]) * _num_tasks);/*最后运行赋值为0*/
     _tick_counter = 0;
 
@@ -231,6 +231,7 @@ void AP_Scheduler::run(uint32_t time_available)
     }
 
     // update number of spare microseconds
+    // 更新备用微妙数
     _spare_micros += time_available;
 
     _spare_ticks++;

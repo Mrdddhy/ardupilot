@@ -171,7 +171,7 @@ bool AP_InertialSensor_Invensense::_has_auxiliary_bus()
 {
     return _dev->bus_type() != AP_HAL::Device::BUS_TYPE_I2C;
 }
-
+/*函数功能：开始数据读取*/
 void AP_InertialSensor_Invensense::start()
 {
     if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
@@ -179,16 +179,19 @@ void AP_InertialSensor_Invensense::start()
     }
 
     // initially run the bus at low speed
+    /*初始化总线以较低的速度运行*/
     _dev->set_speed(AP_HAL::Device::SPEED_LOW);
 
     // only used for wake-up in accelerometer only low power mode
-    _register_write(MPUREG_PWR_MGMT_2, 0x00);
-    hal.scheduler->delay(1);
+    _register_write(MPUREG_PWR_MGMT_2, 0x00);/*只允许用户配置加速度计仅在低功耗模式下的唤醒频率*/
+    hal.scheduler->delay(1);/*延迟1ms*/
 
     // always use FIFO
+    /*重置FIFO*/
     _fifo_reset();
 
     // grab the used instances
+    /*攫取使用的实例，gdev为陀螺仪设备，adev为加速度计设备*/
     enum DevTypes gdev, adev;
     switch (_mpu_type) {
     case Invensense_MPU9250:
@@ -223,6 +226,7 @@ void AP_InertialSensor_Invensense::start()
     /*
       setup temperature sensitivity and offset. This varies
       considerably between parts
+      设置温度敏感度和偏移，这在不同的部分差异很大
      */
     switch (_mpu_type) {
     case Invensense_MPU9250:
@@ -252,7 +256,8 @@ void AP_InertialSensor_Invensense::start()
         temp_sensitivity = 0.003f;
         break;
     }
-
+   
+    /*注册IMU实例*/
     _gyro_instance = _imu.register_gyro(1000, _dev->get_bus_id_devtype(gdev));
     _accel_instance = _imu.register_accel(1000, _dev->get_bus_id_devtype(adev));
 
@@ -260,6 +265,7 @@ void AP_InertialSensor_Invensense::start()
     _set_filter_register();
 
     // update backend sample rate
+    /*设置IMU原始采样频率*/
     _set_accel_raw_sample_rate(_accel_instance, _backend_rate_hz);
     _set_gyro_raw_sample_rate(_gyro_instance, _backend_rate_hz);
 
@@ -274,6 +280,9 @@ void AP_InertialSensor_Invensense::start()
     
     // set sample rate to 1000Hz and apply a software filter
     // In this configuration, the gyro sample rate is 8kHz
+    /*设置采样频率为1000Hz,且应用一个软件滤波器，
+      在这个配置下，陀螺仪的采样频率为8KHz
+     */
     _register_write(MPUREG_SMPLRT_DIV, 0, true);
     hal.scheduler->delay(1);
 
@@ -330,11 +339,14 @@ void AP_InertialSensor_Invensense::start()
     }
 
     // now that we have initialised, we set the bus speed to high
+    /*初始化完成后，将总线速度拉高*/
     _dev->set_speed(AP_HAL::Device::SPEED_HIGH);
 
+    /*释放信号量*/
     _dev->get_semaphore()->give();
 
     // setup sensor rotations from probe()
+    /*从探针过来设置传感器方位*/
     set_gyro_orientation(_gyro_instance, _rotation);
     set_accel_orientation(_accel_instance, _rotation);
 
@@ -343,12 +355,14 @@ void AP_InertialSensor_Invensense::start()
     _fifo_gyro_scale = _gyro_scale / _fifo_downsample_rate;
     
     // allocate fifo buffer
+    /*分配FIFO Buffer空间*/
     _fifo_buffer = (uint8_t *)hal.util->malloc_type(MPU_FIFO_BUFFER_LEN * MPU_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
     if (_fifo_buffer == nullptr) {
         AP_HAL::panic("Invensense: Unable to allocate FIFO buffer");
     }
 
     // start the timer process to read samples
+    // 启动1ms定时器采样数据更新
     _dev->register_periodic_callback(1000000UL / _backend_rate_hz, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensense::_poll_data, void));
 }
 
@@ -358,10 +372,10 @@ void AP_InertialSensor_Invensense::start()
  */
 bool AP_InertialSensor_Invensense::update()
 {
-    update_accel(_accel_instance);
-    update_gyro(_gyro_instance);
+    update_accel(_accel_instance);//更新加速度数据
+    update_gyro(_gyro_instance);//更新陀螺仪数据
 
-    _publish_temperature(_accel_instance, _temp_filtered);
+    _publish_temperature(_accel_instance, _temp_filtered);//发布温度数据
 
     return true;
 }
@@ -407,7 +421,7 @@ bool AP_InertialSensor_Invensense::_data_ready()
  */
 void AP_InertialSensor_Invensense::_poll_data()
 {
-    _read_fifo();
+    _read_fifo();/*数据读取*/
 }
 
 bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_samples)
@@ -423,8 +437,8 @@ bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_sampl
         
         accel = Vector3f(int16_val(data, 1),
                          int16_val(data, 0),
-                         -int16_val(data, 2));
-        accel *= _accel_scale;
+                         -int16_val(data, 2));//这里是加速度计原始数据
+        accel *= _accel_scale;//转化成多少g
 
         int16_t t2 = int16_val(data, 3);
         if (!_check_raw_temp(t2)) {
@@ -436,16 +450,16 @@ bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_sampl
         }
         float temp = t2 * temp_sensitivity + temp_zero;
         
-        gyro = Vector3f(int16_val(data, 5),
+        gyro = Vector3f(int16_val(data, 5),//这里是陀螺仪原始数据
                         int16_val(data, 4),
                         -int16_val(data, 6));
-        gyro *= _gyro_scale;
+        gyro *= _gyro_scale;//量程转化，变成弧度
 
-        _rotate_and_correct_accel(_accel_instance, accel);
-        _rotate_and_correct_gyro(_gyro_instance, gyro);
+        _rotate_and_correct_accel(_accel_instance, accel);//把加速度数据转换成重力加速度数据，坐标系是NED
+        _rotate_and_correct_gyro(_gyro_instance, gyro);//获取陀螺仪旋转后数据
 
-        _notify_new_accel_raw_sample(_accel_instance, accel, 0, fsync_set);
-        _notify_new_gyro_raw_sample(_gyro_instance, gyro);
+        _notify_new_accel_raw_sample(_accel_instance, accel, 0, fsync_set);//发布加速度数据
+        _notify_new_gyro_raw_sample(_gyro_instance, gyro);//发布陀螺仪数据
 
         _temp_filtered = _temp_filter.apply(temp);
     }
@@ -609,7 +623,7 @@ void AP_InertialSensor_Invensense::_read_fifo()
                 break;
             }
         } else {
-            if (!_accumulate(rx, n)) {
+            if (!_accumulate(rx, n)) {//计算传感器数据
                 break;
             }
         }

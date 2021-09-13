@@ -180,6 +180,10 @@
 // this is used as a general mechanism to make a 'small' build by
 // dropping little used features. We use this to allow us to keep
 // FMUv2 going for as long as possible
+/*
+ 这是一种通过删除很少使用的功能来构建“小型”构建的通用机制,
+ 我们利用这一点让FMUv2尽可能长时间地运行 
+*/
 #ifndef HAL_MINIMIZE_FEATURES
 #define HAL_MINIMIZE_FEATURES       0
 #endif

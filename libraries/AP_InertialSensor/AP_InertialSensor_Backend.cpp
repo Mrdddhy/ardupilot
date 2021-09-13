@@ -93,9 +93,11 @@ void AP_InertialSensor_Backend::_rotate_and_correct_accel(uint8_t instance, Vect
      */
 
     // rotate for sensor orientation
+    //对加速度数据进行旋转
     accel.rotate(_imu._accel_orientation[instance]);
     
     // apply offsets
+    //减掉偏差值
     accel -= _imu._accel_offset[instance];
 
     // apply scaling
@@ -319,6 +321,7 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     }
 }
 
+/*通知数据到前端*/
 void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
                                                              const Vector3f &accel,
                                                              uint64_t sample_us,
@@ -383,7 +386,7 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
             _imu._accel_filter[instance].reset();
         }
 
-        _imu.set_accel_peak_hold(instance, _imu._accel_filtered[instance]);
+        _imu.set_accel_peak_hold(instance, _imu._accel_filtered[instance]);/*得到滤波后的数据*/
 
         _imu._new_accel_data[instance] = true;
     }
@@ -556,6 +559,7 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance)
     }
     
     // possibly update filter frequency
+    // 可能更新滤波频率
     if (_last_accel_filter_hz != _accel_filter_cutoff()) {
         _imu._accel_filter[instance].set_cutoff_frequency(_accel_raw_sample_rate(instance), _accel_filter_cutoff());
         _last_accel_filter_hz = _accel_filter_cutoff();

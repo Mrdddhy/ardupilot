@@ -575,10 +575,12 @@ uint8_t AP_InertialSensor::register_accel(uint16_t raw_sample_rate_hz,
 /*
  * Start all backends for gyro and accel measurements. It automatically calls
  * detect_backends() if it has not been called already.
+ * 函数功能：启动陀螺仪和加速度计测量的所有后端。它自动调用detect_backends函数
  */
 void AP_InertialSensor::_start_backends()
 
 {
+    /*识别板子可用的后端*/
     detect_backends();
 
     for (uint8_t i = 0; i < _backend_count; i++) {
@@ -626,15 +628,19 @@ AP_InertialSensor::init(uint16_t sample_rate)
 {
     // remember the sample rate
     _sample_rate = sample_rate;
-    _loop_delta_t = 1.0f / sample_rate;
+    _loop_delta_t = 1.0f / sample_rate; /*采样频率转换成多少周期s*/
 
     // we don't allow deltat values greater than 10x the normal loop
     // time to be exposed outside of INS. Large deltat values can
     // cause divergence of state estimators
+    /*设置一下最大增量允许时间是正常循环时间的10倍，超过这个数值的话估计其就可能导致估计器发散*/
     _loop_delta_t_max = 10 * _loop_delta_t;
 
+    /*如果陀螺仪的计数个数和加速度计的个数都等于0，
+     我们开始注册IMU传感器
+     */
     if (_gyro_count == 0 && _accel_count == 0) {
-        _start_backends();
+        _start_backends();/*后端读取数据*/
     }
 
     // initialise accel scale if need be. This is needed as we can't
@@ -689,12 +695,13 @@ bool AP_InertialSensor::_add_backend(AP_InertialSensor_Backend *backend)
 
 /*
   detect available backends for this board
+  函数功能：检测这块板子可用的后端
  */
 void
 AP_InertialSensor::detect_backends(void)
 {
     if (_backends_detected) {
-        return;
+        return;  /*如果检测到直接退出*/
     }
 
     _backends_detected = true;
@@ -719,6 +726,7 @@ AP_InertialSensor::detect_backends(void)
 
     /*
       use ADD_BACKEND() macro to allow for INS_ENABLE_MASK for enabling/disabling INS backends
+      使用这个宏来允许INS的掩码位来使能或失能INS后端
      */
 #define ADD_BACKEND(x) do { \
         if (((1U<<probe_count)&enable_mask) && _add_backend(x)) { \
@@ -1237,6 +1245,8 @@ void AP_InertialSensor::_save_gyro_calibration()
 
 /*
   update gyro and accel values from backends
+  IMU数据更新--源自后端
+  2.5ms一次
  */
 void AP_InertialSensor::update(void)
 {
@@ -1255,7 +1265,7 @@ void AP_InertialSensor::update(void)
             _delta_angle_valid[i] = false;
         }
         for (uint8_t i=0; i<_backend_count; i++) {
-            _backends[i]->update();
+            _backends[i]->update();//数据更新，2.5ms一次
         }
 
         // clear accumulators

@@ -161,12 +161,12 @@ static AP_HAL::HAL::Callbacks* g_callbacks;
 
 static void main_loop()
 {
-    daemon_task = chThdGetSelfX();
+    daemon_task = chThdGetSelfX();/*获取守护线程*/
 
     /*
       switch to high priority for main loop
      */
-    chThdSetPriority(APM_MAIN_PRIORITY);
+    chThdSetPriority(APM_MAIN_PRIORITY);/*切换到高优先级*/
 
 #ifdef HAL_I2C_CLEAR_BUS
     // Clear all I2C Buses. This can be needed on some boards which

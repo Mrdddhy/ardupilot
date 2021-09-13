@@ -215,13 +215,13 @@ constexpr int8_t Copter::_failsafe_priorities[7];
 void Copter::setup()
 {
     // Load the default values of variables listed in var_info[]s
-    AP_Param::setup_sketch_defaults();
+    AP_Param::setup_sketch_defaults();/*加载初始化参数*/
 
-    init_ardupilot();
+    init_ardupilot();/*初始化底层相关的，诸如传感器注册*/
 
     // initialise the main loop scheduler
     //scheduler 为AP_Scheduler的一个对象
-    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);
+    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);/*初始化调度器*/
 }
 
 void Copter::loop()
@@ -235,17 +235,17 @@ void Copter::loop()
 void Copter::fast_loop()
 {
     // update INS immediately to get current gyro data populated
-    ins.update();
+    ins.update();//立即更新INS以获得当前的陀螺仪数据填充，传感器更新
 
     // run low level rate controllers that only require IMU data
-    attitude_control->rate_controller_run();
+    attitude_control->rate_controller_run();//运行低频率角速度控制器
 
     // send outputs to the motors library immediately
-    motors_output();
+    motors_output();//立即将输出发送到电机库
 
     // run EKF state estimator (expensive)
-    // --------------------
-    read_AHRS();
+    // --------------------运行EKF数据评估
+    read_AHRS();//主要是姿态解算
 
 #if FRAME_CONFIG == HELI_FRAME
     update_heli_control_dynamics();
@@ -255,29 +255,29 @@ void Copter::fast_loop()
 #endif //HELI_FRAME
 
     // Inertial Nav
-    // --------------------
+    // --------------------惯性导航数据获取
     read_inertia();
 
     // check if ekf has reset target heading or position
-    check_ekf_reset();
+    check_ekf_reset(); //检测EKF是否已重置目标航向或位置
 
     // run the attitude controllers
-    update_flight_mode();
+    update_flight_mode();//更新飞行模式，运行姿态控制器
 
     // update home from EKF if necessary
-    update_home_from_EKF();
+    update_home_from_EKF();//必要时从EKF更新起飞点的位置
 
     // check if we've landed or crashed
-    update_land_and_crash_detectors();
+    update_land_and_crash_detectors();//检查飞机是否着落或坠毁
 
 #if MOUNT == ENABLED
     // camera mount's fast update
-    camera_mount.update_fast();
+    camera_mount.update_fast();//相机快速更新
 #endif
 
     // log sensor health
     if (should_log(MASK_LOG_ANY)) {
-        Log_Sensor_Health();
+        Log_Sensor_Health();//记录健康的传感器数据
     }
 }
 
