@@ -321,7 +321,7 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     }
 }
 
-/*通知数据到前端*/
+/*函数功能：通知数据到前端*/
 void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
                                                              const Vector3f &accel,
                                                              uint64_t sample_us,

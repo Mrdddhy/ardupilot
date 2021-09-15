@@ -86,20 +86,25 @@ void AP_AHRS_NavEKF::reset_gyro_drift(void)
     EKF3.resetGyroBias();
 }
 
+/*函数功能：运行EKF初始化和更新*/
 void AP_AHRS_NavEKF::update(bool skip_ins_update)
 {
     // support locked access functions to AHRS data
+    /*支持AHRS数据锁定访问功能*/
     WITH_SEMAPHORE(_rsem);
     
     // drop back to normal priority if we were boosted by the INS
     // calling delay_microseconds_boost()
+    /*如果我们被INS提升，回到正常优先级调用delay_microseconds_boost()*/
     hal.scheduler->boost_end();
     
     // EKF1 is no longer supported - handle case where it is selected
+    /*EKF1不再支持，处理一下对应的句柄，设置为EKF2*/
     if (_ekf_type == 1) {
         _ekf_type.set(2);
     }
 
+    /*skip_ins_update ==true*/
     update_DCM(skip_ins_update);
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -144,6 +149,7 @@ void AP_AHRS_NavEKF::update_DCM(bool skip_ins_update)
     // we need to restore the old DCM attitude values as these are
     // used internally in DCM to calculate error values for gyro drift
     // correction
+    /*我们需要恢复旧的DCM姿态数值，因为这些是在DCM内部使用陀螺仪偏移计算误差值，用来做校正使用*/
     roll = _dcm_attitude.x;
     pitch = _dcm_attitude.y;
     yaw = _dcm_attitude.z;
@@ -157,13 +163,13 @@ void AP_AHRS_NavEKF::update_DCM(bool skip_ins_update)
 
 void AP_AHRS_NavEKF::update_EKF2(void)
 {
-    if (!_ekf2_started) {
+    if (!_ekf2_started) {  /*_ekf2_started = 0*/
         // wait 1 second for DCM to output a valid tilt error estimate
         if (start_time_ms == 0) {
-            start_time_ms = AP_HAL::millis();
+            start_time_ms = AP_HAL::millis();/*等待一秒用于DCM输出有效的倾斜估计*/
         }
         if (AP_HAL::millis() - start_time_ms > startup_delay_ms || _force_ekf) {
-            _ekf2_started = EKF2.InitialiseFilter();
+            _ekf2_started = EKF2.InitialiseFilter();/*初始化EKF2，为运行EKF2做更新准备*/
             if (_force_ekf) {
                 return;
             }
@@ -183,6 +189,7 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             update_trig();
 
             // Use the primary EKF to select the primary gyro
+            /*使用优先级比较高的gyro做EKF运算*/
             const int8_t primary_imu = EKF2.getPrimaryCoreIMUIndex();
 
             const AP_InertialSensor &_ins = AP::ins();

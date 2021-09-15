@@ -93,25 +93,37 @@ AP_Scheduler *AP_Scheduler::get_singleton()
 }
 
 // initialise the scheduler
+/*函数功能：任务列表调度初始化---主要是设置初始一些滴答计时器
+  参数1：全局任务列表数组首地址
+  参数2：全局任务列表数组大小
+  参数3：日志运行标志位(1<<3)
+*/
 void AP_Scheduler::init(const AP_Scheduler::Task *tasks, uint8_t num_tasks, uint32_t log_performance_bit)
 {
     _tasks = tasks;/*任务指针*/
     _num_tasks = num_tasks;/*总共的任务数*/
-    _last_run = new uint16_t[_num_tasks];/*最后运行的任务*/
-    memset(_last_run, 0, sizeof(_last_run[0]) * _num_tasks);/*最后运行赋值为0*/
-    _tick_counter = 0;
+
+    /*数组，用于记录每个任务最后运行时记录的tickcount数*/
+    _last_run = new uint16_t[_num_tasks];
+
+    /*memset函数是内存赋值函数，用来给某一块内存空间进行赋值的,包含在<string.h>
+     函数原型：void* memset(void *s,int v,size_t n)
+    */
+    memset(_last_run, 0, sizeof(_last_run[0]) * _num_tasks);/*初始赋值均为0*/
+    _tick_counter = 0;/*滴答计数器初始设置为0*/
 
     // setup initial performance counters
-    perf_info.set_loop_rate(get_loop_rate_hz());/*初始化执行计数*/
+    /*设置初始性能计数器，干什么用的？*/
+    perf_info.set_loop_rate(get_loop_rate_hz());
     perf_info.reset();
 
-    _log_performance_bit = log_performance_bit;/*log执行位*/
+    _log_performance_bit = log_performance_bit;/*log执行位，1<<3*/
 }
 
 // one tick has passed
 void AP_Scheduler::tick(void)
 {
-    _tick_counter++;
+    _tick_counter++;/*滴答计数器加1*/
 }
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -129,6 +141,7 @@ static void fill_nanf_stack(void)
 /*
   run one tick
   this will run as many scheduler tasks as we can in the specified time
+  函数功能：这里在特定的时间里将会运行尽可能多的调度任务
  */
 void AP_Scheduler::run(uint32_t time_available)
 {
@@ -146,21 +159,31 @@ void AP_Scheduler::run(uint32_t time_available)
     }
     /*循环执行任务*/
     for (uint8_t i=0; i<_num_tasks; i++) {
-        uint32_t dt = _tick_counter - _last_run[i];/*获取单个任务的时间*/
-        uint32_t interval_ticks = _loop_rate_hz / _tasks[i].rate_hz;/*间隔时间，主循环时间/任务时间一定要大于1*/
+        /*dt:执行一个loop,记录的任务列表中每个任务被执行的次数,
+             因此dt表示上次运行的那个任务到现在这里的圈数
+        */
+        uint32_t dt = _tick_counter - _last_run[i];
+
+        /*interval_ticks：这个值表示执行某个任务所需要的圈数
+          假如该任务是20Hz，那就应该是运行了20圈(400/20 = 20)后执行该任务
+        */
+        uint32_t interval_ticks = _loop_rate_hz / _tasks[i].rate_hz;/*间隔时间，主循环频率(400)/任务频率，一定要大于1*/
+
+        /*任务最大也只能400Hz,也就是一圈*/
         if (interval_ticks < 1) {
-            interval_ticks = 1;  /*小于1被限制等于*/
+            interval_ticks = 1;  /*小于1被限制等于1*/
         }
-        /*一般不会存在*/
+        /*如果dt<interval_ticks将会结束继续允许该任务(所需圈数不够)，跳到下一个循环任务*/
         if (dt < interval_ticks) {
             // this task is not yet scheduled to run again 
             continue;
         }
         // this task is due to run. Do we have enough time to run it?
-        // 此任务将运行，我们有足够的时间跑吗
-        _task_time_allowed = _tasks[i].max_time_micros;
+        /* 这里也就是说如果某一次任务时不满足上述条件，则此任务将运行，
+           但是要先计算我们有足够的时间跑吗*/
+        _task_time_allowed = _tasks[i].max_time_micros;/*获取该任务最大允许的运行时间*/
         
-        /*时间不应该超过这个值*/
+        /*圈数(时间)不应该超过这个值*/
         if (dt >= interval_ticks*2) {
             // we've slipped a whole run of this task!
             // 我们把这项任务搞砸了
@@ -171,11 +194,12 @@ void AP_Scheduler::run(uint32_t time_available)
                   (unsigned)interval_ticks,
                   (unsigned)_task_time_allowed);
         }
-        /*可能还有其他的任务可以满足，因此for循环还是会继续*/
+        
         if (dt >= interval_ticks*max_task_slowdown) {
             // we are going beyond the maximum slowdown factor for a
             // task. This will trigger increasing the time budget
-            task_not_achieved++;
+            /*我们超出了任务最大减速系数，这将增加时间预算*/
+            task_not_achieved++;/*不能获取的任务加1*/
         }
 
         if (_task_time_allowed > time_available) {
@@ -188,7 +212,7 @@ void AP_Scheduler::run(uint32_t time_available)
 
         // run it
         //开始运行它
-        _task_time_started = now;
+        _task_time_started = now;/*记录满足条件的任务开始运行的时间*/
         hal.util->persistent_data.scheduler_task = i;/*当前运行的是哪个任务*/
         if (_debug > 1 && _perf_counters && _perf_counters[i]) {
             hal.util->perf_begin(_perf_counters[i]); /*调试信息*/
@@ -196,7 +220,8 @@ void AP_Scheduler::run(uint32_t time_available)
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         fill_nanf_stack();
 #endif
-        _tasks[i].function();
+        _tasks[i].function();/*--------运行该任务函数------*/
+
         if (_debug > 1 && _perf_counters && _perf_counters[i]) {
             hal.util->perf_end(_perf_counters[i]);
         }
@@ -204,24 +229,25 @@ void AP_Scheduler::run(uint32_t time_available)
 
         // record the tick counter when we ran. This drives
         // when we next run the event
-        // 我们跑的时候记录下滴答计数器，当我们下次跑的时候会驱动
+        // 我们运行的时候记录下滴答计数器，这会驱使我们下次运行任务事件
         _last_run[i] = _tick_counter;
 
         // work out how long the event actually took
         // 算出这件事实际花了多长时间
-        now = AP_HAL::micros();
-        uint32_t time_taken = now - _task_time_started;/*计算两次时间差*/
+        now = AP_HAL::micros();/*获取当前时间*/
+        uint32_t time_taken = now - _task_time_started;/*计算运行任务的两次时间消耗*/
          
-         /*判断是否超时*/
+         /*判断是否超时，这里的超时指的是超过其任务最长运行时间*/
         if (time_taken > _task_time_allowed) {
             // the event overran!
+            /*任务事件超出了*/
             debug(3, "Scheduler overrun task[%u-%s] (%u/%u)\n",
                   (unsigned)i,
                   _tasks[i].name,
                   (unsigned)time_taken,
                   (unsigned)_task_time_allowed);
         }
-        /*如果超时了，记录现在可以使用的时间是0*/
+        /*如果超过可用时间，记录现在可以使用的时间是0，直接跳出循环*/
         if (time_taken >= time_available) {
             time_available = 0;
             break;
@@ -266,24 +292,27 @@ float AP_Scheduler::load_average()
     return used_time / (float)loop_us;
 }
 
+/*函数功能：*/
 void AP_Scheduler::loop()
 {
     // 等待INS采样频率---wait for an INS sample
     hal.util->persistent_data.scheduler_task = -3;
-    AP::ins().wait_for_sample();/*获取采样时间*/
+    AP::ins().wait_for_sample();/*获取采样时间，设置delta_time和下一采样时刻*/
     hal.util->persistent_data.scheduler_task = -1;
 
-    const uint32_t sample_time_us = AP_HAL::micros();
-    /*循环计数开始时间等于多少us*/
+    const uint32_t sample_time_us = AP_HAL::micros();/*获取当前时间*/
+    /*一开始先判断进入这个*/
     if (_loop_timer_start_us == 0) {
-        _loop_timer_start_us = sample_time_us;
-        _last_loop_time_s = get_loop_period_s();
+        _loop_timer_start_us = sample_time_us;/*loop定时器开始的时间：us，从当前时间开始*/
+        _last_loop_time_s = get_loop_period_s();/*获取上一个loop周期时间:s*/
     } else {
-        _last_loop_time_s = (sample_time_us - _loop_timer_start_us) * 1.0e-6;/*两次时间差*/
+        _last_loop_time_s = (sample_time_us - _loop_timer_start_us) * 1.0e-6;/*两次时间差，单位为s，第一次之后才会进入这个*/
     }
 
     //执行快速循环任务 Execute the fast loop
-    // ---------------------
+    // 这里怎么运行到fast_loop的呢？---------------------
+    // 这里把 _fastloop_fn()和fast_loop()函数绑定到同一块地址上，就可以运行fast_loop了
+    // 要理解一下怎么具体绑在一起的
     if (_fastloop_fn) {
         hal.util->persistent_data.scheduler_task = -2;
         _fastloop_fn();
@@ -302,32 +331,40 @@ void AP_Scheduler::loop()
 #endif
 
     // tell the scheduler one tick has passed
-    tick();/*告诉任务调度器一个时钟节拍已经过去*/
+    tick();/*告诉任务调度器一个时钟节拍已经过去，滴答计数器加1*/
 
     // run all the tasks that are due to run. Note that we only
     // have to call this once per loop, as the tasks are scheduled
     // in multiples of the main loop tick. So if they don't run on
     // the first call to the scheduler they won't run on a later
     // call until scheduler.tick() is called again
-    const uint32_t loop_us = get_loop_period_us();
-    uint32_t now = AP_HAL::micros();
-    uint32_t time_available = 0;
+    /*运行所有应运行的程序，注意，我们只需要在每次循环中调用这个函数一次，因为任务是以主循环的倍数
+      来调度的。因此，如果它们没有对在调度程序的第一次调用中运行，它们也不会在以后的调用中运行，
+      直到再次调用scheduler.tick()
+    */
+    const uint32_t loop_us = get_loop_period_us();/*主循环时间，400Hz，loop_us =1/400 = 2.5ms = 2500us*/
+    uint32_t now = AP_HAL::micros();/*获取当前时间*/
+    uint32_t time_available = 0;/*用来存放可用时间*/
     if (now - sample_time_us < loop_us) {
         // get remaining time available for this loop
+        /*获得剩余可用的时间*/
         time_available = loop_us - (now - sample_time_us);
     }
 
     // add in extra loop time determined by not achieving scheduler tasks
+    /*增加由未完成调度器任务所决定的任务循环时间*/
     time_available += extra_loop_us;
 
     // run the tasks
-    run(time_available);
+    /*------在可用时间内运行任务列表相关任务------*/
+    run(time_available);/*注：非常重要的一个函数*/
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     // move result of AP_HAL::micros() forward:
     hal.scheduler->delay_microseconds(1);
 #endif
 
+   /*这里是处理没有获得的任务，是因为在run(time_available)里面可能存在超时的可能*/
     if (task_not_achieved > 0) {
         // add some extra time to the budget
         extra_loop_us = MIN(extra_loop_us+100U, 5000U);
@@ -346,8 +383,10 @@ void AP_Scheduler::loop()
     }
 
     // check loop time
+    /*检查一下loop_time*/
     perf_info.check_loop_time(sample_time_us - _loop_timer_start_us);
-        
+    
+    /*赋值时间给loop 定时器的起始时间*/
     _loop_timer_start_us = sample_time_us;
 }
 

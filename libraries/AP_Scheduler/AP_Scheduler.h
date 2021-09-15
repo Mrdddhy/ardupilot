@@ -158,6 +158,7 @@ private:
     AP_Int8 _debug;
 
     // overall scheduling rate in Hz
+    /*整体调度频率*/
     AP_Int16 _loop_rate_hz;
 
     // loop rate in Hz as set at startup
@@ -217,6 +218,7 @@ private:
     
     // extra time available for each loop - used to dynamically adjust
     // the loop rate in case we are well over budget
+    /*额外的时间可用于每个循环-用于动态调整循环率，以防我们远远超出预算 */
     uint32_t extra_loop_us;
 };
 

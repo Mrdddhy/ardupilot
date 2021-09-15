@@ -374,9 +374,13 @@ void NavEKF2_core::InitialiseVariablesMag()
 
 // Initialise the states from accelerometer and magnetometer data (if present)
 // This method can only be used when the vehicle is static
+/*从加速度计和磁力计(如果出现)的数据初始化状态
+  这个方法当且仅当飞机是静止时
+*/
 bool NavEKF2_core::InitialiseFilterBootstrap(void)
 {
     // If we are a plane and don't have GPS lock then don't initialise
+    /*如果是一架飞机，没有GPS锁，不要进行初始化*/
     if (assume_zero_sideslip() && AP::gps().status() < AP_GPS::GPS_OK_FIX_3D) {
         hal.util->snprintf(prearm_fail_string,
                            sizeof(prearm_fail_string),
@@ -397,46 +401,58 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     }
 
     // set re-used variables to zero
+    /*将重新使用的变量设置为0*/
     InitialiseVariables();
 
+    /*获取ins数据*/
     const AP_InertialSensor &ins = AP::ins();
 
     // Initialise IMU data
+    /*初始化IMU数据*/
     dtIMUavg = ins.get_loop_delta_t();
     readIMUData();
     storedIMU.reset_history(imuDataNew);
     imuDataDelayed = imuDataNew;
 
     // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
+    /*机体坐标系下的加速度矢量*/
     Vector3f initAccVec;
 
     // TODO we should average accel readings over several cycles
+    /*我们应该在几个周期内进行平均读数*/
     initAccVec = ins.get_accel(accel_index_active);
 
     // read the magnetometer data
+    /*读取地磁数据*/
     readMagData();
 
     // normalise the acceleration vector
+    /*归一化加速度矢量*/
     float pitch=0, roll=0;
-    if (initAccVec.length() > 0.001f) {
+    if (initAccVec.length() > 0.001f) {//模长
         initAccVec.normalize();
 
         // calculate initial pitch angle
+        /*计算俯仰角度*/
         pitch = asinf(initAccVec.x);
 
         // calculate initial roll angle
+        /*计算横滚角度*/
         roll = atan2f(-initAccVec.y , -initAccVec.z);
     }
 
     // calculate initial roll and pitch orientation
+    /*计算初始滚转和俯仰方向*/
     stateStruct.quat.from_euler(roll, pitch, 0.0f);
 
     // initialise dynamic states
+    /*初始化动态状态*/
     stateStruct.velocity.zero();
     stateStruct.position.zero();
     stateStruct.angErr.zero();
 
     // initialise static process model states
+    /*初始化静态过程模型状态*/
     stateStruct.gyro_bias.zero();
     stateStruct.gyro_scale.x = 1.0f;
     stateStruct.gyro_scale.y = 1.0f;
@@ -447,27 +463,34 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     stateStruct.body_magfield.zero();
 
     // read the GPS and set the position and velocity states
+    /*读取GPS并设置位置和速度状态*/
     readGpsData();
     ResetVelocity();
     ResetPosition();
 
     // read the barometer and set the height state
+    /*读取气压计并设置和速度状态*/
     readBaroData();
     ResetHeight();
 
     // define Earth rotation vector in the NED navigation frame
+    /*NED导航框架中地球旋转矢量的定义*/
     calcEarthRateNED(earthRateNED, _ahrs->get_home().lat);
 
     // initialise the covariance matrix
+    /*初始化协方差矩阵*/
     CovarianceInit();
 
     // reset output states
+    /*复位输出状态变量*/
     StoreOutputReset();
 
     // set to true now that states have be initialised
+    /*既然状态已经初始化，设置为true*/
     statesInitialised = true;
 
     // reset inactive biases
+    /*重置为不活跃偏差*/
     for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
         inactiveBias[i].gyro_bias.zero();
         inactiveBias[i].accel_zbias = 0;
@@ -477,50 +500,52 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     }
 
     // we initially return false to wait for the IMU buffer to fill
+    /*我们最初返回false以等待IMU缓冲区填充*/
     return false;
 }
 
 // initialise the covariance matrix
+/*函数功能：初始化协方差矩阵*/
 void NavEKF2_core::CovarianceInit()
 {
-    // zero the matrix
+    //复位协方差矩阵------ zero the matrix
     memset(&P[0][0], 0, sizeof(P));
 
-    // attitude error
+    //姿态误差协方差------ attitude error
     P[0][0]   = 0.1f;
     P[1][1]   = 0.1f;
     P[2][2]   = 0.1f;
-    // velocities
+    //速度协方差----------- velocities
     P[3][3]   = sq(frontend->_gpsHorizVelNoise);
     P[4][4]   = P[3][3];
     P[5][5]   = sq(frontend->_gpsVertVelNoise);
-    // positions
+    //位置协方差----------- positions
     P[6][6]   = sq(frontend->_gpsHorizPosNoise);
     P[7][7]   = P[6][6];
     P[8][8]   = sq(frontend->_baroAltNoise);
-    // gyro delta angle biases
+    //陀螺仪角度偏差增量协方差----- gyro delta angle biases
     P[9][9] = sq(radians(InitialGyroBiasUncertainty() * dtEkfAvg));
     P[10][10] = P[9][9];
     P[11][11] = P[9][9];
-    // gyro scale factor biases
+    //陀螺仪尺度因子协方差------- gyro scale factor biases
     P[12][12] = sq(1e-3);
     P[13][13] = P[12][12];
     P[14][14] = P[12][12];
-    // Z delta velocity bias
+    //Z轴速度增量偏差协方差------ Z delta velocity bias
     P[15][15] = sq(INIT_ACCEL_BIAS_UNCERTAINTY * dtEkfAvg);
-    // earth magnetic field
+    //地磁地理坐标系协方差------- earth magnetic field
     P[16][16] = 0.0f;
     P[17][17] = P[16][16];
     P[18][18] = P[16][16];
-    // body magnetic field
+    //机体坐标系磁场协方差-------- body magnetic field
     P[19][19] = 0.0f;
     P[20][20] = P[19][19];
     P[21][21] = P[19][19];
-    // wind velocities
+    //风速协方差------------------ wind velocities
     P[22][22] = 0.0f;
     P[23][23]  = P[22][22];
 
-    // optical flow ground height covariance
+    //光流高度协方差------------- optical flow ground height covariance
     Popt = 0.25f;
 }
 
@@ -531,14 +556,17 @@ void NavEKF2_core::CovarianceInit()
 void NavEKF2_core::UpdateFilter(bool predict)
 {
     // Set the flag to indicate to the filter that the front-end has given permission for a new state prediction cycle to be started
+    /*设置标志用来向ekf2滤波器，指示前端一允许启动新的状态预测周期*/
     startPredictEnabled = predict;
 
     // don't run filter updates if states have not been initialised
+    /*如果未初始化状态完成，请不要运行滤波器更新*/
     if (!statesInitialised) {
         return;
     }
 
     // start the timer used for load measurement
+    /*启动定时器用于加载测量*/
 #if ENABLE_EKF_TIMING
     void *istate = hal.scheduler->disable_interrupts_save();
     static uint32_t timing_start_us;
@@ -551,48 +579,63 @@ void NavEKF2_core::UpdateFilter(bool predict)
     // TODO - in-flight restart method
 
     //get starting time for update step
+    /*获取更新步骤的开始时间*/
     imuSampleTime_ms = frontend->imuSampleTime_us / 1000;
 
     // Check arm status and perform required checks and mode changes
+    /*检查遥控器是否解锁电机和执行必要的检查和模式*/
     controlFilterModes();
 
     // read IMU data as delta angles and velocities
+    /*读取IMU数据作为角度和速度*/
     readIMUData();
 
     // Run the EKF equations to estimate at the fusion time horizon if new IMU data is available in the buffer
+    /*如果在缓冲区中存在新的IMU数据，在满足的融合时间内，运行EKF方程*/
     if (runUpdates) {
         // Predict states using IMU data from the delayed time horizon
+        /*预测方程：使用IMU的数据，从延迟尺度时间*/
         UpdateStrapdownEquationsNED();
 
         // Predict the covariance growth
+        /*预测协方差增长*/
         CovariancePrediction();
 
         // Update states using  magnetometer data
+        /*使用地磁数据更新状态*/
         SelectMagFusion();
 
         // Update states using GPS and altimeter data
+        /*使用GPS和气压计进行状态更新*/
         SelectVelPosFusion();
 
         // Update states using range beacon data
+        /*使用测距仪进行状态更新*/
         SelectRngBcnFusion();
 
         // Update states using optical flow data
+        /*使用光流传感器进行更新数据*/
         SelectFlowFusion();
 
         // Update states using airspeed data
+        /*使用空速计数据进行更新数据*/    
         SelectTasFusion();
 
         // Update states using sideslip constraint assumption for fly-forward vehicles
+        /*使用侧滑约束假设更新飞行前向飞行器的状态*/
         SelectBetaFusion();
 
         // Update the filter status
+        /*更新滤波器的状态*/
         updateFilterStatus();
     }
 
     // Wind output forward from the fusion to output time horizon
+    /*从融合数据到数据输出*/
     calcOutputStates();
 
     // stop the timer used for load measurement
+    /*停止用于加载测量的定时器*/
     hal.util->perf_end(_perf_UpdateFilter);
 #if ENABLE_EKF_TIMING
     static uint32_t total_us;
@@ -648,6 +691,8 @@ void NavEKF2_core::correctDeltaVelocity(Vector3f &delVel, float delVelDT, uint8_
  * not used by the EKF equations, which instead estimate the error in the attitude of
  * the vehicle when each observation is fused. This attitude error is then used to correct
  * the quaternion.
+ * 使用延迟IMU测量数据，更新四元数、速度、位置状态，因为EKF在时域上运行
+ * 注意：四元数不被EKF方程所使用，而是每次观测融合时估计车辆姿态中的误差。
 */
 void NavEKF2_core::UpdateStrapdownEquationsNED()
 {
@@ -655,6 +700,9 @@ void NavEKF2_core::UpdateStrapdownEquationsNED()
     // the delta angle rotation quaternion and normalise
     // apply correction for earth's rotation rate
     // % * - and + operators have been overloaded
+    /*通过以前的姿态旋转更新四元数，并归一化应用于修正地球旋转速度矢量
+      运算符进行重载
+    */
     stateStruct.quat.rotate(delAngCorrected - prevTnb * earthRateNED*imuDataDelayed.delAngDT);
     stateStruct.quat.normalize();
 
@@ -1413,17 +1461,20 @@ void NavEKF2_core::zeroCols(Matrix24 &covMat, uint8_t first, uint8_t last)
 }
 
 // reset the output data to the current EKF state
+/*函数功能：复位输出当前EKF的状态*/
 void NavEKF2_core::StoreOutputReset()
 {
     outputDataNew.quat = stateStruct.quat;
     outputDataNew.velocity = stateStruct.velocity;
     outputDataNew.position = stateStruct.position;
     // write current measurement to entire table
+    /*将当前测量写入整个表*/
     for (uint8_t i=0; i<imu_buffer_length; i++) {
         storedOutput[i] = outputDataNew;
     }
     outputDataDelayed = outputDataNew;
     // reset the states for the complementary filter used to provide a vertical position dervative output
+    /*重置用于提供垂直位置输出的互补滤波器的状态*/
     vertCompFiltState.pos = stateStruct.position.z;
     vertCompFiltState.vel = stateStruct.velocity.z;
 }

@@ -1098,36 +1098,45 @@ void Copter::load_parameters(void)
     }
 
     // disable centrifugal force correction, it will be enabled as part of the arming process
+    /*禁用离心力校正，它将会在解锁过程中使能*/
     ahrs.set_correct_centrifugal(false);
     hal.util->set_soft_armed(false);
 
+    /*如果格式版本加载失败或者格式版本不是定义的格式版本*/
     if (!g.format_version.load() ||
         g.format_version != Parameters::k_format_version) {
 
         // erase all parameters
+        /*擦除所有参数*/
         hal.console->printf("Firmware change: erasing EEPROM...\n");
         StorageManager::erase();
         AP_Param::erase_all();
 
         // save the current format version
+        /*保存当前格式版本*/
         g.format_version.set_and_save(Parameters::k_format_version);
         hal.console->printf("done.\n");
     }
-
+    /*获取当前的时间*/
     uint32_t before = micros();
+
     // Load all auto-loaded EEPROM variables
+    /*加载所有自动装载在EEPROM的变量*/
     AP_Param::load_all();
     AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
 
     // convert landing gear parameters
+    /*转化起落架参数*/
     convert_lgr_parameters();
 
     // convert fs_options parameters
     convert_fs_options_params();
-
+    
+    /*打印加载所有参数消耗了多长时间：us*/
     hal.console->printf("load_all took %uus\n", (unsigned)(micros() - before));
 
     // setup AP_Param frame type flags
+    /*设置机架类型---Copter_Frame*/
     AP_Param::set_frame_type_flags(AP_PARAM_FRAME_COPTER);
 
 }

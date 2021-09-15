@@ -389,6 +389,7 @@ private:
     // the states are available in two forms, either as a Vector31, or
     // broken down as individual elements. Both are equivalent (same
     // memory)
+    /*状态输入变量 ---28维*/
     struct state_elements {
         Vector3f    angErr;         // 0..2
         Vector3f    velocity;       // 3..5
@@ -407,6 +408,7 @@ private:
         struct state_elements stateStruct;
     };
 
+    /*状态输出变量----10维*/
     struct output_elements {
         Quaternion  quat;           // 0..3
         Vector3f    velocity;       // 4..6

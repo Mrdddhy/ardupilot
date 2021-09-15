@@ -303,12 +303,15 @@ void NavEKF2_core::readIMUData()
     const AP_InertialSensor &ins = AP::ins();
 
     // average IMU sampling rate
+    /*平均IMU采样速率*/
     dtIMUavg = ins.get_loop_delta_t();
 
     // the imu sample time is used as a common time reference throughout the filter
+    /*IMU采样时间用作整个滤波器的公共时间基准*/
     imuSampleTime_ms = AP_HAL::millis();
 
     // use the nominated imu or primary if not available
+    /*如果没有，请使用指定的imu或主imu*/
     uint8_t accel_active, gyro_active;
 
     if (ins.use_accel(imu_index)) {
@@ -345,17 +348,21 @@ void NavEKF2_core::readIMUData()
     }
 
     // update the inactive bias states
+    /*更新不活跃的偏差状态*/
     learnInactiveBiases();
 
+   /*读取增量速度*/
     readDeltaVelocity(accel_index_active, imuDataNew.delVel, imuDataNew.delVelDT);
     accelPosOffset = ins.get_imu_pos_offset(accel_index_active);
     imuDataNew.accel_index = accel_index_active;
 
     // Get delta angle data from primary gyro or primary if not available
+    /*读取增量角度*/
     readDeltaAngle(gyro_index_active, imuDataNew.delAng, imuDataNew.delAngDT);
     imuDataNew.gyro_index = gyro_index_active;
 
     // Get current time stamp
+    /*获取时间*/
     imuDataNew.time_ms = imuSampleTime_ms;
 
     // use the most recent IMU index for the downsampled IMU
@@ -365,22 +372,28 @@ void NavEKF2_core::readIMUData()
     imuDataDownSampledNew.accel_index = imuDataNew.accel_index;
 
     // Accumulate the measurement time interval for the delta velocity and angle data
+    /*积分算角度增量和速度增量*/
     imuDataDownSampledNew.delAngDT += imuDataNew.delAngDT;
     imuDataDownSampledNew.delVelDT += imuDataNew.delVelDT;
 
-    // Rotate quaternon atitude from previous to new and normalise.
-    // Accumulation using quaternions prevents introduction of coning errors due to downsampling
+    //Rotate quaternon atitude from previous to new and normalise.
+    //Accumulation using quaternions prevents introduction of coning errors due to downsampling
+    /*角度得到旋转后的四元数矩阵，进行归一化处理
+      使用四元数的累积防止由于下采样引起圆锥误差*/
     imuQuatDownSampleNew.rotate(imuDataNew.delAng);
     imuQuatDownSampleNew.normalize();
 
     // Rotate the latest delta velocity into body frame at the start of accumulation
+    /*旋转最小的速度到机体坐标系中，并进行累积*/
     Matrix3f deltaRotMat;
     imuQuatDownSampleNew.rotation_matrix(deltaRotMat);
 
     // Apply the delta velocity to the delta velocity accumulator
+    /*申请积分速度累加*/
     imuDataDownSampledNew.delVel += deltaRotMat*imuDataNew.delVel;
 
     // Keep track of the number of IMU frames since the last state prediction
+    /*申请IMU预测的数目*/
     framesSincePredict++;
 
     /*
@@ -388,24 +401,32 @@ void NavEKF2_core::readIMUData()
      * then store the accumulated IMU data to be used by the state prediction, ignoring the frontend permission if more
      * than twice the target time has lapsed. Adjust the target EKF step time threshold to allow for timing jitter in the
      * IMU data.
+     * 如果目标EKF时间步长已经累积，并且前端允许开始新的预测周期，
+     * 然后存储由状态预测所使用的累积IMU数据，如果超过目标时间的两倍，则忽略前端许可
+     * 调整目标EKF步进时间阈值，以允许IMU数据中的定时抖动。
      */
     if ((dtIMUavg*(float)framesSincePredict >= (EKF_TARGET_DT-(dtIMUavg*0.5)) &&
          startPredictEnabled) || (dtIMUavg*(float)framesSincePredict >= 2.0f*EKF_TARGET_DT)) {
 
         // convert the accumulated quaternion to an equivalent delta angle
+        /*转换累积的四元数到姿态角*/
         imuQuatDownSampleNew.to_axis_angle(imuDataDownSampledNew.delAng);
 
         // Time stamp the data
+        /*获取时间*/
         imuDataDownSampledNew.time_ms = imuSampleTime_ms;
 
         // Write data to the FIFO IMU buffer
+        /*新数据写入缓冲区*/
         storedIMU.push_youngest_element(imuDataDownSampledNew);
 
         // calculate the achieved average time step rate for the EKF
+        /*计算EKF平均步长*/
         float dtNow = constrain_float(0.5f*(imuDataDownSampledNew.delAngDT+imuDataDownSampledNew.delVelDT),0.0f,10.0f*EKF_TARGET_DT);
         dtEkfAvg = 0.98f * dtEkfAvg + 0.02f * dtNow;
 
         // zero the accumulated IMU data and quaternion
+        /*清空累计的IMU数据和四元数*/
         imuDataDownSampledNew.delAng.zero();
         imuDataDownSampledNew.delVel.zero();
         imuDataDownSampledNew.delAngDT = 0.0f;
@@ -416,16 +437,20 @@ void NavEKF2_core::readIMUData()
         imuQuatDownSampleNew[3] = imuQuatDownSampleNew[2] = imuQuatDownSampleNew[1] = 0.0f;
 
         // reset the counter used to let the frontend know how many frames have elapsed since we started a new update cycle
+        /*重置计数器，用于让前端知道自从我们开始新的更新周期以来已经有多少帧已经过去了*/
         framesSincePredict = 0;
 
         // set the flag to let the filter know it has new IMU data and needs to run
+        /*设置标志，让滤波器知道它有新的IMU数据需要运行*/
         runUpdates = true;
 
         // extract the oldest available data from the FIFO buffer
+        /*设置标志，让过滤器知道它有新的IMU数据需要运行*/
         imuDataDelayed = storedIMU.pop_oldest_element();
 
         // protect against delta time going to zero
         // TODO - check if calculations can tolerate 0
+        /*防止增量时间为0*/
         float minDT = 0.1f*dtEkfAvg;
         imuDataDelayed.delAngDT = MAX(imuDataDelayed.delAngDT,minDT);
         imuDataDelayed.delVelDT = MAX(imuDataDelayed.delVelDT,minDT);
@@ -433,6 +458,7 @@ void NavEKF2_core::readIMUData()
         updateTimingStatistics();
             
         // correct the extracted IMU data for sensor errors
+        /*更正外部IMU数据为传感器误差*/
         delAngCorrected = imuDataDelayed.delAng;
         delVelCorrected = imuDataDelayed.delVel;
         correctDeltaAngle(delAngCorrected, imuDataDelayed.delAngDT, imuDataDelayed.gyro_index);

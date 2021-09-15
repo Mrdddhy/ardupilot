@@ -16,25 +16,33 @@ extern const AP_HAL::HAL& hal;
 void NavEKF2_core::controlFilterModes()
 {
     // Determine motor arm status
+    /*确定电机状态*/
     prevMotorsArmed = motorsArmed;
     motorsArmed = hal.util->get_soft_armed();
     if (motorsArmed && !prevMotorsArmed) {
         // set the time at which we arm to assist with checks
+        /*设定我们协助检查的时间*/
         timeAtArming_ms =  imuSampleTime_ms;
     }
 
     // Detect if we are in flight on or ground
+    /*检查我们是否在地面上飞行*/
     detectFlight();
 
     // Determine if learning of wind and magnetic field will be enabled and set corresponding indexing limits to
     // avoid unnecessary operations
+    /*确定是否启用风和磁场的学习并设置相应的索引限制以避免不必要的操作*/
     setWindMagStateLearningMode();
 
     // Check the alignmnent status of the tilt and yaw attitude
     // Used during initial bootstrap alignment of the filter
+    /*检查倾斜和偏航姿态的对齐状态
+      在过滤器初始引导对齐过程中使用
+    */
     checkAttitudeAlignmentStatus();
 
     // Set the type of inertial navigation aiding used
+    /*设置惯导辅助型*/
     setAidingMode();
 
 }

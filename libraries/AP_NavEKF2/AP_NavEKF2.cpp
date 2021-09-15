@@ -624,17 +624,21 @@ bool NavEKF2::InitialiseFilter(void)
     if (_enable == 0) {
         return false;
     }
+    /*获取传感器数据，gyro,acc*/
     const AP_InertialSensor &ins = AP::ins();
 
+    /*获取IMU采样时间，单位是us*/
     imuSampleTime_us = AP_HAL::micros64();
 
     // remember expected frame time
     _frameTimeUsec = 1e6 / ins.get_sample_rate();
 
     // expected number of IMU frames per prediction
+    /*算有多少个预测imu方程，因为这里有好几组imu,都可以进行ekf*/
     _framesPerPrediction = uint8_t((EKF_TARGET_DT / (_frameTimeUsec * 1.0e-6) + 0.5));
 
     // see if we will be doing logging
+    /*看看我们是否会做日志记录*/
     AP_Logger *logger = AP_Logger::get_singleton();
     if (logger != nullptr) {
         logging.enabled = logger->log_replay();
@@ -643,6 +647,7 @@ bool NavEKF2::InitialiseFilter(void)
     if (core == nullptr) {
 
         // don't run multiple filters for 1 IMU
+        /*不要对一个IMU进行多次滤波*/
         uint8_t mask = (1U<<ins.get_accel_count())-1;
         _imuMask.set(_imuMask.get() & mask);
         
@@ -655,6 +660,7 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         // check if there is enough memory to create the EKF cores
+        /*检测是否有足够的内存来创建EKF内核*/
         if (hal.util->available_memory() < sizeof(NavEKF2_core)*num_cores + 4096) {
             gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF2: not enough memory");
             _enable.set(0);
@@ -662,6 +668,7 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         // try to allocate from CCM RAM, fallback to Normal RAM if not available or full
+        /*尝试从CCM RAM分配，退路就是到常规的RAM分配如果不可用或者已经使用满*/
         core = (NavEKF2_core*)hal.util->malloc_type(sizeof(NavEKF2_core)*num_cores, AP_HAL::Util::MEM_FAST);
         if (core == nullptr) {
             _enable.set(0);
@@ -670,11 +677,13 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         //Call Constructors on all cores
+        /*创建对象，用来做EKF2运算，这里创建了两个对象，对应两组IMU*/
         for (uint8_t i = 0; i < num_cores; i++) {
             new (&core[i]) NavEKF2_core(this);
         }
 
         // set the IMU index for the cores
+        /*为内核设置IMU索引*/
         num_cores = 0;
         for (uint8_t i=0; i<7; i++) {
             if (_imuMask & (1U<<i)) {
@@ -694,6 +703,7 @@ bool NavEKF2::InitialiseFilter(void)
     
     // initialise the cores. We return success only if all cores
     // initialise successfully
+    /*EKF内核初始化，我们将会成功返回当且仅当所有的核都初始化成功*/
     bool ret = true;
     for (uint8_t i=0; i<num_cores; i++) {
         ret &= core[i].InitialiseFilterBootstrap();
@@ -709,14 +719,18 @@ bool NavEKF2::InitialiseFilter(void)
 }
 
 // Update Filter States - this should be called whenever new IMU data is available
+/*函数功能：EKF更新
+ *这个函数在任何新的IMU数据可用时都应该更新滤波器
+*/
 void NavEKF2::UpdateFilter(void)
 {
     if (!core) {
         return;
     }
-
+    /*获取IMU采样时间*/
     imuSampleTime_us = AP_HAL::micros64();
     
+    /*获取ins数据*/
     const AP_InertialSensor &ins = AP::ins();
 
     bool statePredictEnabled[num_cores];
@@ -725,6 +739,9 @@ void NavEKF2::UpdateFilter(void)
         // have already used more than 1/3 of the CPU budget for this
         // loop then suppress the prediction step. This allows
         // multiple EKF instances to cooperate on scheduling
+        /*如果我们没有超过3个IMU系时，或者我们已经在这个循环使用超过CPU的三分之一预算，然后抑制预测步骤，
+         这样允许多个EKF实例协同调度？
+        */
         if (core[i].getFramesSincePredict() < (_framesPerPrediction+3) &&
             (AP_HAL::micros() - ins.get_last_update_usec()) > _frameTimeUsec/3) {
             statePredictEnabled[i] = false;

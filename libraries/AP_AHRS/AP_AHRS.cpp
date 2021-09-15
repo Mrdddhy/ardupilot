@@ -227,6 +227,7 @@ void AP_AHRS::add_trim(float roll_in_radians, float pitch_in_radians, bool save_
 }
 
 // Set the board mounting orientation, may be called while disarmed
+/*设置板子的安装方向*/
 void AP_AHRS::update_orientation()
 {
     const enum Rotation orientation = (enum Rotation)_board_orientation.get();

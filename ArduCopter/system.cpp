@@ -26,20 +26,21 @@ void Copter::init_ardupilot()
 
     hal.console->printf("\n\nInit %s"
                         "\n\nFree RAM: %u\n",
-                        AP::fwversion().fw_string,
+                        AP::fwversion().fw_string,              /*打印软件版本(git版本)*/
                         (unsigned)hal.util->available_memory());/*打印剩下可用内存*/
 
     //
     // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
     //
-    report_version();/*报告版本代码*/
+    report_version();/*报告版本格式代码*/
 
     // load parameters from EEPROM
     load_parameters();/*从EEPROM加载参数*/
 
     // time per loop - this gets updated in the main loop() based on
     // actual loop rate
-    G_Dt = 1.0 / scheduler.get_loop_rate_hz();/*获取运行周期*/
+    /*每一圈循环时间--这个得以更新是在main_loop()里面基于实际循环速率的*/
+    G_Dt = 1.0 / scheduler.get_loop_rate_hz();/*获取运行周期时间*/
 
 #if STATS_ENABLED == ENABLED
     // initialise stats module
@@ -47,10 +48,10 @@ void Copter::init_ardupilot()
 #endif
 
     // identify ourselves correctly with the ground station
-    mavlink_system.sysid = g.sysid_this_mav;/*辨识与地面站正确连接*/
+    mavlink_system.sysid = g.sysid_this_mav;/*辨识我们与地面站正确连接*/
     
     // initialise serial ports
-    serial_manager.init();/*串口初始化*/
+    serial_manager.init();/*串口管理初始化*/
 
     // setup first port early to allow BoardConfig to report errors
     gcs().setup_console();/*设置第一个端口允许波特率配置去报告错误*/
@@ -66,18 +67,18 @@ void Copter::init_ardupilot()
 
     // init cargo gripper
 #if GRIPPER_ENABLED == ENABLED
-    g2.gripper.init();
+    g2.gripper.init();/*夹具初始化*/
 #endif
 
 #if AC_FENCE == ENABLED
-    fence.init();
+    fence.init();/*地理围栏初始化*/
 #endif
     
     // init winch and wheel encoder
     winch_init();/*轮式编码器初始化，飞机disabled*/
 
     // initialise notify system
-    notify.init();
+    notify.init();/*通知对象初始化*/
     notify_flight_mode();/*飞行模式通知*/
 
     // initialise battery monitor
@@ -251,7 +252,7 @@ void Copter::init_ardupilot()
     logger.setVehicle_Startup_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 
     /*IMU传感器注册开始*/
-    startup_INS_ground();
+    startup_INS_ground();/*--重点理解这个传感器的注册过程---*/
 
 #ifdef ENABLE_SCRIPTING
     g2.scripting.init();
@@ -275,6 +276,7 @@ void Copter::init_ardupilot()
     ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
 
     // enable output to motors
+    /*如果遥控校准检测通过，使能电机输出*/
     if (arming.rc_calibration_checks(true)) {
         enable_motor_output();
     }
@@ -304,8 +306,8 @@ void Copter::init_ardupilot()
 void Copter::startup_INS_ground()
 {
     // initialise ahrs (may push imu calibration into the mpu6000 if using that device).
-    ahrs.init();/*初始化AHRS*/
-    ahrs.set_vehicle_class(AHRS_VEHICLE_COPTER);
+    ahrs.init();/*初始化AHRS---设置安装方向*/
+    ahrs.set_vehicle_class(AHRS_VEHICLE_COPTER);/*设置车辆为旋翼*/
 
     // Warm up and calibrate gyro offsets
     ins.init(scheduler.get_loop_rate_hz());/*预热和校准陀螺仪偏差*/

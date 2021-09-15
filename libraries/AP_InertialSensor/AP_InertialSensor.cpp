@@ -1345,54 +1345,67 @@ void AP_InertialSensor::update(void)
 /*
   wait for a sample to be available. This is the function that
   determines the timing of the main loop in ardupilot.
-
+  **等待采样可用，这就是那个确定ardupilot主循环的时间**
   Ideally this function would return at exactly the rate given by the
   sample_rate argument given to AP_InertialSensor::init().
+  **理想情况下这个函数将会返回精确的速率，在AP_InertialSensor::init()的
+  采样速率给定参数的情况下，AP_InertialSensor::init()这个要看INS初始化那里**
 
   The key output of this function is _delta_time, which is the time
   over which the gyro and accel integration will happen for this
   sample. We want that to be a constant time if possible, but if
   delays occur we need to cope with them. The long term sum of
   _delta_time should be exactly equal to the wall clock elapsed time
+  **这个函数重要的输出是:delta_time,它是陀螺仪和加速度计在这段时间采样过程的积分
+  如果有可能的话，我们想让它为一个常值，但是如果延时发生，我们需要去处理它。**
+   
+  总结：主要是delta_time和下一时刻采样点的记录
  */
 void AP_InertialSensor::wait_for_sample(void)
 {
     if (_have_sample) {
         // the user has called wait_for_sample() again without
         // consuming the sample with update()
+        /*如果用户再一次调用了这个函数但没有用update()使用这个采样，则直接返回*/
         return;
     }
 
-    uint32_t now = AP_HAL::micros();
+    uint32_t now = AP_HAL::micros();/*获取当前时间*/
 
+   /*如果下一采样时刻为0 且增量时间delta_time小于等于0，则需要先首次进入这个判断，之后就不需要*/
     if (_next_sample_usec == 0 && _delta_time <= 0) {
         // this is the first call to wait_for_sample()
-        _last_sample_usec = now - _sample_period_usec;
-        _next_sample_usec = now + _sample_period_usec;
-        goto check_sample;
+        _last_sample_usec = now - _sample_period_usec;/*计算得到上一次采样的时刻(us)    =当前时刻-采样周期时间*/
+        _next_sample_usec = now + _sample_period_usec;/*理论计算得到下一次采样的时刻(us)=当前时刻+采样周期时间*/
+        goto check_sample;/*跳转到后面：check_sample*/
     }
 
+    /*----总结一下这里主要干了啥： 下面主要是如何处理计算下一时刻采样时间_next_sample_usec---，
+      -----这是第一次之后进来要做的事情--------*/
     // see how long it is till the next sample is due
     if (_next_sample_usec - now <=_sample_period_usec) {
         // we're ahead on time, schedule next sample at expected period
-        uint32_t wait_usec = _next_sample_usec - now;
-        hal.scheduler->delay_microseconds_boost(wait_usec);
-        uint32_t now2 = AP_HAL::micros();
+        uint32_t wait_usec = _next_sample_usec - now;/*如果下一次采样的时间不需要用到一个采样周期的时间，则获取实际对应的时间*/
+        hal.scheduler->delay_microseconds_boost(wait_usec);/*再延时上述对应等待的时间：单位是us*/
+        uint32_t now2 = AP_HAL::micros();/*再次获取当前的时刻*/
         if (now2+100 < _next_sample_usec) {
+            /*上面延时可能不准，延时一下等待时间可能还是没到下一时刻(延时少了)，然后打印短休眠*/
             timing_printf("shortsleep %u\n", (unsigned)(_next_sample_usec-now2));
         }
         if (now2 > _next_sample_usec+400) {
+            /*相反如果延时多了，就可能超过下一时刻了，打印长休眠*/
             timing_printf("longsleep %u wait_usec=%u\n",
                           (unsigned)(now2-_next_sample_usec),
                           (unsigned)wait_usec);
         }
-        _next_sample_usec += _sample_period_usec;
-    } else if (now - _next_sample_usec < _sample_period_usec/8) {
+        _next_sample_usec += _sample_period_usec;/*再一次获得相对于上一次的理论采样时间+采样周期 = 下下时刻的采样时刻点*/
+    } else if (now - _next_sample_usec < _sample_period_usec/8) {   /*如果now已经超过了上一时刻，则计算对应的时间差*/
         // we've overshot, but only by a small amount, keep on
         // schedule with no delay
+        /*时间差小于时间周期的1/8则不需要延时，直接设置下一时刻的采样时刻*/
         timing_printf("overshoot1 %u\n", (unsigned)(now-_next_sample_usec));
         _next_sample_usec += _sample_period_usec;
-    } else {
+    } else {/*如果超过太多了，也是直接设置下一时刻采样点*/
         // we've overshot by a larger amount, re-zero scheduling with
         // no delay
         timing_printf("overshoot2 %u\n", (unsigned)(now-_next_sample_usec));
@@ -1400,7 +1413,7 @@ void AP_InertialSensor::wait_for_sample(void)
     }
 
 check_sample:
-    if (!_hil_mode) {
+    if (!_hil_mode) { /*HIL_MODE硬件在环，一种仿真模式，这里设置为1，也就是这个判断进不去*/
         // now we wait until we have the gyro and accel samples we need
         uint8_t gyro_available_mask = 0;
         uint8_t accel_available_mask = 0;
@@ -1461,15 +1474,17 @@ check_sample:
             wait_counter++;
         }
     }
-
-    now = AP_HAL::micros();
+    /*直接跳到这里*/
+    now = AP_HAL::micros();/*获取当前时间*/
+    /*获得增量时间_delta_time*/
     if (_hil_mode && _hil.delta_time > 0) {
-        _delta_time = _hil.delta_time;
-        _hil.delta_time = 0;
+        _delta_time = _hil.delta_time;/*赋值给delta_time*/
+        _hil.delta_time = 0;/*再清零*/
     } else {
-        _delta_time = (now - _last_sample_usec) * 1.0e-6f;
+        _delta_time = (now - _last_sample_usec) * 1.0e-6f;/* delta_time单位:为s */
     }
-    _last_sample_usec = now;
+    _last_sample_usec = now;/*赋值一下，也就是记录上一时刻的采样为当前时刻*/
+
 
 #if 0
     {
@@ -1489,7 +1504,7 @@ check_sample:
     }
 #endif
 
-    _have_sample = true;
+    _have_sample = true;/*最后设置标志位，说明已经拥有了采样*/
 }
 
 

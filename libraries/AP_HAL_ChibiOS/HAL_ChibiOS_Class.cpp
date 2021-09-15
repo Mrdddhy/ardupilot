@@ -15,7 +15,7 @@
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #include <AP_HAL/AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS/*等一下取消注释*/
 
 #include <assert.h>
 
@@ -159,6 +159,7 @@ thread_t* get_main_thread()
 
 static AP_HAL::HAL::Callbacks* g_callbacks;
 
+/*函数功能：*/
 static void main_loop()
 {
     daemon_task = chThdGetSelfX();/*获取守护线程*/
@@ -166,7 +167,7 @@ static void main_loop()
     /*
       switch to high priority for main loop
      */
-    chThdSetPriority(APM_MAIN_PRIORITY);/*切换到高优先级*/
+    chThdSetPriority(APM_MAIN_PRIORITY);/*切换到高优先级，优先级为180*/
 
 #ifdef HAL_I2C_CLEAR_BUS
     // Clear all I2C Buses. This can be needed on some boards which
@@ -191,31 +192,31 @@ static void main_loop()
     hal.uartC->begin(57600);
     hal.analogin->init();  /*模拟端口初始化*/
     
-    hal.scheduler->init();/*任务调度初始化*/
+    hal.scheduler->init();/*---创建信号量、设置线程---*/
 
     /*
     * 以低优先级运行setup()以确保CLI不会挂起系统，并允许初始传感器读取回路运行
       run setup() at low priority to ensure CLI doesn't hang the
       system, and to allow initial sensor read loops to run
      */
-    hal_chibios_set_priority(APM_STARTUP_PRIORITY);
+    hal_chibios_set_priority(APM_STARTUP_PRIORITY);/*优先级为10*/
 
     if (stm32_was_watchdog_reset()) {
         // load saved watchdog data
         stm32_watchdog_load((uint32_t *)&utilInstance.persistent_data, (sizeof(utilInstance.persistent_data)+3)/4);
         utilInstance.last_persistent_data = utilInstance.persistent_data;
     }
-    /*初始化hal*/
+    /*初始化硬件抽象层hal，设置状态为true*/
     schedulerInstance.hal_initialized();
-    /*回调setup函数*/
-    g_callbacks->setup();
+    
+    g_callbacks->setup();/*----回调setup函数，进入Copter::setup()----*/
 
 #ifdef IOMCU_FW
     stm32_watchdog_init();
 #elif !defined(HAL_BOOTLOADER_BUILD)
     // setup watchdog to reset if main loop stops
     if (AP_BoardConfig::watchdog_enabled()) {
-        stm32_watchdog_init();
+        stm32_watchdog_init();/*看门狗初始化*/
     }
 
 #ifndef HAL_NO_LOGGING
@@ -227,19 +228,21 @@ static void main_loop()
 
     schedulerInstance.watchdog_pat();
 
-    hal.scheduler->system_initialized();
+    /*上述诸多初始化动作完成，即可标志系统初始化完成？*/
+    hal.scheduler->system_initialized();/*系统初始化,设置状态为true*/
 
-    thread_running = true;
-    chRegSetThreadName(SKETCHNAME);
+    thread_running = true;/*设置线程运行状态为true*/
+    chRegSetThreadName(SKETCHNAME);/*设置线程名字*/
 
     /*
-      *切换到主回路的高优先级
+      *切换到主回路的高优先级--180
       switch to high priority for main loop
      */
     chThdSetPriority(APM_MAIN_PRIORITY);
-
+ 
+ /*---循环运行下去---类似主函数里的*/
     while (true) {
-        g_callbacks->loop();
+        g_callbacks->loop();/*进入Copter::loop()*/
 
         /*
           give up 50 microseconds of time if the INS loop hasn't
@@ -290,12 +293,12 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
     };
     sdStart((SerialDriver*)&HAL_STDOUT_SERIAL, &stdoutcfg);
 #endif
-
-    assert(callbacks);/*断言回调函数*/
+    /*callbacks = &Copter*/
+    assert(callbacks);/*断言一下回调函数*/
     g_callbacks = callbacks;/*赋值回调函数*/
 
     //Takeover main
-    main_loop();/*执行main_loop函数*/
+    main_loop();/*---执行main_loop函数--*/
 }
 
 const AP_HAL::HAL& AP_HAL::get_HAL() {

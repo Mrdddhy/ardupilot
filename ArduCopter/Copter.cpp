@@ -87,7 +87,10 @@ const AP_HAL::HAL& hal = AP_HAL::get_HAL();
   scheduler table for fast CPUs - all regular tasks apart from the fast_loop()
   should be listed here, along with how often they should be called (in hz)
   and the maximum time they are expected to take (in microseconds)
-  任务列表数组
+  **------全局任务列表数组------**
+  **参数1：任务函数入口：任务函数执行体
+  **参数2：该任务调用的频率：保证任务多久运行
+  **参数3：执行该任务不超过的最大运行时间(us)：该任务运行一次占用CPU的最长时间
  */
 const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(rc_loop,              100,    130),//读取遥控器
@@ -215,15 +218,16 @@ constexpr int8_t Copter::_failsafe_priorities[7];
 void Copter::setup()
 {
     // Load the default values of variables listed in var_info[]s
-    AP_Param::setup_sketch_defaults();/*加载初始化参数*/
+    AP_Param::setup_sketch_defaults();/*加载一些变量默认的初始化参数*/
 
-    init_ardupilot();/*初始化底层相关的，诸如传感器注册*/
+    init_ardupilot();/*初始化底层驱动相关的，诸如传感器注册，加载相关参数，建立与后端的关系*/
 
     // initialise the main loop scheduler
     //scheduler 为AP_Scheduler的一个对象
-    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);/*初始化调度器*/
+    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);/*初始化调度器的任务列表*/
 }
 
+ /*---g_callbacks->loop()进入这里---*/
 void Copter::loop()
 {
     scheduler.loop();
@@ -244,7 +248,7 @@ void Copter::fast_loop()
     motors_output();//立即将输出发送到电机库
 
     // run EKF state estimator (expensive)
-    // --------------------运行EKF数据评估
+    // --------------------运行EKF估计器
     read_AHRS();//主要是姿态解算
 
 #if FRAME_CONFIG == HELI_FRAME
@@ -575,7 +579,8 @@ void Copter::read_AHRS(void)
 #endif
 
     // we tell AHRS to skip INS update as we have already done it in fast_loop()
-    ahrs.update(true);
+    // 我们告诉AHRS跳过INS更新，因为我们已经在Fast_loop()中完成了它
+    ahrs.update(true);/*ahrs为AP_AHRS_NavEKF的对象*/
 }
 
 // read baro and log control tuning

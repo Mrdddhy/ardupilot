@@ -67,6 +67,7 @@ Scheduler::Scheduler()
 {
 }
 
+/*函数功能：创建信号量、线程相关*/
 void Scheduler::init()
 {
     chBSemObjectInit(&_timer_semaphore, false);/*创建定时器信号量*/
@@ -77,7 +78,7 @@ void Scheduler::init()
     //设置监视器线程，用于软件锁仓？
     _monitor_thread_ctx = chThdCreateStatic(_monitor_thread_wa,
                      sizeof(_monitor_thread_wa),
-                     APM_MONITOR_PRIORITY,        /* Initial priority.    */
+                     APM_MONITOR_PRIORITY,        /* Initial priority.--183    */
                      _monitor_thread,             /* Thread function.     */
                      this);                     /* Thread parameter.    */
 #endif
@@ -87,17 +88,17 @@ void Scheduler::init()
     //设置定时器线程，这将调用1Khz的任务
     _timer_thread_ctx = chThdCreateStatic(_timer_thread_wa,
                      sizeof(_timer_thread_wa),
-                     APM_TIMER_PRIORITY,        /* Initial priority.    */
+                     APM_TIMER_PRIORITY,        /* Initial priority. --181   */
                      _timer_thread,             /* Thread function.     */
                      this);                     /* Thread parameter.    */
 #endif
 
 #ifndef HAL_NO_RCIN_THREAD
     // setup the RCIN thread - this will call tasks at 1kHz
-    // 设置RCIN线程-这将调用1Khz的任务
+    // 设置RCIN(遥控器)线程-这将调用1Khz的任务
     _rcin_thread_ctx = chThdCreateStatic(_rcin_thread_wa,
                      sizeof(_rcin_thread_wa),
-                     APM_RCIN_PRIORITY,        /* Initial priority.    */
+                     APM_RCIN_PRIORITY,        /* Initial priority. --177   */
                      _rcin_thread,             /* Thread function.     */
                      this);                     /* Thread parameter.    */
 #endif
@@ -106,8 +107,8 @@ void Scheduler::init()
     // IO线程以较低优先级运行
     _io_thread_ctx = chThdCreateStatic(_io_thread_wa,
                      sizeof(_io_thread_wa),
-                     APM_IO_PRIORITY,        /* Initial priority.      */
-                     _io_thread,             /* Thread function.       */
+                     APM_IO_PRIORITY,        /* Initial priority. --58      */
+                     _io_thread,             /* Thread function.      */
                      this);                  /* Thread parameter.      */
 #endif
 
@@ -116,7 +117,7 @@ void Scheduler::init()
     // 存储线程以略高于IO优先级的方式运行
     _storage_thread_ctx = chThdCreateStatic(_storage_thread_wa,
                      sizeof(_storage_thread_wa),
-                     APM_STORAGE_PRIORITY,        /* Initial priority.      */
+                     APM_STORAGE_PRIORITY,        /* Initial priority. --59     */
                      _storage_thread,             /* Thread function.       */
                      this);                  /* Thread parameter.      */
 #endif

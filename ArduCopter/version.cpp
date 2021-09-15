@@ -27,7 +27,7 @@ const AP_FWVersion AP_FWVersion::fwver{
 #ifndef GIT_VERSION
     .fw_string = THISFIRMWARE,
     .fw_hash_str = "",
-#else
+#else/*实际定义了git的版本*/
     .fw_string = THISFIRMWARE " (" GIT_VERSION ")",
     .fw_hash_str = GIT_VERSION,
 #endif
