@@ -502,22 +502,27 @@ AP_InertialSensor *AP_InertialSensor::get_singleton()
 
 /*
   register a new gyro instance
+  函数功能：注册一个新的陀螺仪实例
+  参数1：原始数据采样频率
+  参数2: 设备id
  */
 uint8_t AP_InertialSensor::register_gyro(uint16_t raw_sample_rate_hz,
                                          uint32_t id)
 {
+    /*INS最大实例个数是6*/
     if (_gyro_count == INS_MAX_INSTANCES) {
         AP_HAL::panic("Too many gyros");
     }
 
-    _gyro_raw_sample_rates[_gyro_count] = raw_sample_rate_hz;
+    _gyro_raw_sample_rates[_gyro_count] = raw_sample_rate_hz;/*赋值得到对应的采样频率*/
     _gyro_over_sampling[_gyro_count] = 1;
     _gyro_raw_sampling_multiplier[_gyro_count] = INT16_MAX/radians(2000);
 
-    bool saved = _gyro_id[_gyro_count].load();
+    bool saved = _gyro_id[_gyro_count].load();/*从EEPROM加载对应的ID，加载成功返回true*/
 
     if (saved && (uint32_t)_gyro_id[_gyro_count] != id) {
         // inconsistent gyro id - mark it as needing calibration
+        /*ID不一致需要校准*/
         _gyro_cal_ok[_gyro_count] = false;
     }
 
@@ -583,15 +588,17 @@ void AP_InertialSensor::_start_backends()
     /*识别板子可用的后端*/
     detect_backends();
 
+    /*正式开启后端*/
     for (uint8_t i = 0; i < _backend_count; i++) {
-        _backends[i]->start();
+        _backends[i]->start();/*---看void AP_InertialSensor_Invensense::start()--*/
     }
-
+    /*显然这里不能成立*/
     if (_gyro_count == 0 || _accel_count == 0) {
         AP_HAL::panic("INS needs at least 1 gyro and 1 accel");
     }
 
     // clear IDs for unused sensor instances
+    /*清除没有使用的传感器实例ID*/
     for (uint8_t i=get_accel_count(); i<INS_MAX_INSTANCES; i++) {
         _accel_id[i].set(0);
     }
@@ -623,10 +630,10 @@ AP_InertialSensor_Backend *AP_InertialSensor::_find_backend(int16_t backend_id, 
     return nullptr;
 }
 
-void
-AP_InertialSensor::init(uint16_t sample_rate)
+void AP_InertialSensor::init(uint16_t sample_rate)
 {
     // remember the sample rate
+    /*记录采样频率*/
     _sample_rate = sample_rate;
     _loop_delta_t = 1.0f / sample_rate; /*采样频率转换成多少周期s*/
 
@@ -640,11 +647,14 @@ AP_InertialSensor::init(uint16_t sample_rate)
      我们开始注册IMU传感器
      */
     if (_gyro_count == 0 && _accel_count == 0) {
-        _start_backends();/*后端读取数据*/
+        _start_backends();/*-----开启后端-----，内容很丰富----*/
     }
 
     // initialise accel scale if need be. This is needed as we can't
     // give non-zero default values for vectors in AP_Param
+    /*如果有需要的话，初始化加速度计尺度因子。这是主要因为我们默认从AP_Param里
+      加载参数，我们不能给其提供非零的默认值。
+    */
     for (uint8_t i=0; i<get_accel_count(); i++) {
         if (_accel_scale[i].get().is_zero()) {
             _accel_scale[i].set(Vector3f(1,1,1));
@@ -652,6 +662,7 @@ AP_InertialSensor::init(uint16_t sample_rate)
     }
 
     // calibrate gyros unless gyro calibration has been disabled
+    /*校准陀螺，除非陀螺校准已被禁用 */
     if (gyro_calibration_timing() != GYRO_CAL_NEVER) {
         init_gyro();
     }
@@ -1662,21 +1673,26 @@ AuxiliaryBus *AP_InertialSensor::get_auxiliary_bus(int16_t backend_id, uint8_t i
 void AP_InertialSensor::calc_vibration_and_clipping(uint8_t instance, const Vector3f &accel, float dt)
 {
     // check for clipping
+    /*检测加速度爬升*/
     if (_backends[instance] == nullptr) {
         return;
     }
+    /*加速度计爆量程*/
     if (fabsf(accel.x) >  _backends[instance]->get_clip_limit() ||
         fabsf(accel.y) >  _backends[instance]->get_clip_limit() ||
         fabsf(accel.z) > _backends[instance]->get_clip_limit()) {
-        _accel_clip_count[instance]++;
+        _accel_clip_count[instance]++;/*clip数递增*/
     }
 
     // calculate vibration levels
+    /*计算颤抖水平*/
     if (instance < INS_VIBRATION_CHECK_INSTANCES) {
         // filter accel at 5hz
+        /*5hz滤波*/
         Vector3f accel_filt = _accel_vibe_floor_filter[instance].apply(accel, dt);
 
         // calc difference from this sample and 5hz filtered value, square and filter at 2hz
+        /*计算前后滤波前后两次差值，再对差值取平方再进行2hz滤波*/
         Vector3f accel_diff = (accel - accel_filt);
         accel_diff.x *= accel_diff.x;
         accel_diff.y *= accel_diff.y;
@@ -1686,6 +1702,7 @@ void AP_InertialSensor::calc_vibration_and_clipping(uint8_t instance, const Vect
 }
 
 // peak hold detector for slower mechanisms to detect spikes
+/*峰值保持检测器为较慢的机制检测尖峰*/
 void AP_InertialSensor::set_accel_peak_hold(uint8_t instance, const Vector3f &accel)
 {
     if (instance != _primary_accel) {

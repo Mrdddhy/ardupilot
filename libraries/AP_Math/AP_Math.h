@@ -165,6 +165,7 @@ inline int64_t constrain_int64(const int64_t amt, const int64_t low, const int64
 }
 
 // degrees -> radians
+/*constexpr为修饰常量，const只读*/
 static inline constexpr float radians(float deg)
 {
     return deg * DEG_TO_RAD;

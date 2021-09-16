@@ -171,9 +171,11 @@ bool AP_InertialSensor_Invensense::_has_auxiliary_bus()
 {
     return _dev->bus_type() != AP_HAL::Device::BUS_TYPE_I2C;
 }
-/*函数功能：开始数据读取*/
+
+/*函数功能：配置相关IMU寄存器操作，完成后开始数据读取*/
 void AP_InertialSensor_Invensense::start()
 {
+    /*如果设备还未能获得对应的信号量，直接返回*/
     if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
         return;
     }
@@ -211,7 +213,7 @@ void AP_InertialSensor_Invensense::start()
     case Invensense_ICM20608:
     default:
         gdev = DEVTYPE_GYR_MPU6000;
-        adev = DEVTYPE_ACC_MPU6000;
+        adev = DEVTYPE_ACC_MPU6000;/*默认*/
         break;
     case Invensense_ICM20789:
         gdev = DEVTYPE_INS_ICM20789;
@@ -257,7 +259,7 @@ void AP_InertialSensor_Invensense::start()
         break;
     }
    
-    /*注册IMU实例*/
+    /*注册IMU实例，注册频率为1000Hz*/
     _gyro_instance = _imu.register_gyro(1000, _dev->get_bus_id_devtype(gdev));
     _accel_instance = _imu.register_accel(1000, _dev->get_bus_id_devtype(adev));
 
@@ -325,6 +327,7 @@ void AP_InertialSensor_Invensense::start()
     }
     
     // configure interrupt to fire when new data arrives
+    /*配置中断在新数据到来时触发*/
     _register_write(MPUREG_INT_ENABLE, BIT_RAW_RDY_EN);
     hal.scheduler->delay(1);
 
@@ -346,11 +349,12 @@ void AP_InertialSensor_Invensense::start()
     _dev->get_semaphore()->give();
 
     // setup sensor rotations from probe()
-    /*从探针过来设置传感器方位*/
+    /*从探针probe()过来设置传感器方位？*/
     set_gyro_orientation(_gyro_instance, _rotation);
     set_accel_orientation(_accel_instance, _rotation);
 
     // setup scale factors for fifo data after downsampling
+    /*下采样后重新设置一下尺度因子*/
     _fifo_accel_scale = _accel_scale / (MAX(_fifo_downsample_rate,2)/2);
     _fifo_gyro_scale = _gyro_scale / _fifo_downsample_rate;
     
@@ -362,7 +366,8 @@ void AP_InertialSensor_Invensense::start()
     }
 
     // start the timer process to read samples
-    // 启动1ms定时器采样数据更新
+    // 启动1ms定时器采样数据更新，在_backend_rate_hz = 1000Hz的时候
+    //*----进入_poll_data()发布数据---*/
     _dev->register_periodic_callback(1000000UL / _backend_rate_hz, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensense::_poll_data, void));
 }
 
@@ -418,18 +423,20 @@ bool AP_InertialSensor_Invensense::_data_ready()
 
 /*
  * Timer process to poll for new data from the Invensense. Called from bus thread with semaphore held
+ * 定时器进程从Invensense轮询新数据。 从持有信号量的总线线程调用  
  */
 void AP_InertialSensor_Invensense::_poll_data()
 {
     _read_fifo();/*数据读取*/
 }
 
+/*函数功能：计算处理并发布IMU相关数据*/
 bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_samples)
 {
     for (uint8_t i = 0; i < n_samples; i++) {
         const uint8_t *data = samples + MPU_SAMPLE_SIZE * i;
         Vector3f accel, gyro;
-        bool fsync_set = false;
+        bool fsync_set = false;/*帧同步设置*/
 
 #if INVENSENSE_EXT_SYNC_ENABLE
         fsync_set = (int16_val(data, 2) & 1U) != 0;
@@ -437,31 +444,33 @@ bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_sampl
         
         accel = Vector3f(int16_val(data, 1),
                          int16_val(data, 0),
-                         -int16_val(data, 2));//这里是加速度计原始数据
+                         -int16_val(data, 2));//这里是加速度计原始数据，右前上转化到前右下
         accel *= _accel_scale;//转化成多少g
 
-        int16_t t2 = int16_val(data, 3);
+        int16_t t2 = int16_val(data, 3);/*这个数据是跟温度有关的数据*/
+        /*如果温度数据有问题*/
         if (!_check_raw_temp(t2)) {
             if (!hal.scheduler->in_expected_delay()) {
                 debug("temp reset IMU[%u] %d %d", _accel_instance, _raw_temp, t2);
             }
-            _fifo_reset();
-            return false;
+            _fifo_reset();/*重置FIFO*/
+            return false;/*直接返回false*/
         }
-        float temp = t2 * temp_sensitivity + temp_zero;
+        float temp = t2 * temp_sensitivity + temp_zero;/*温度原始数据*/
         
-        gyro = Vector3f(int16_val(data, 5),//这里是陀螺仪原始数据
+        gyro = Vector3f(int16_val(data, 5),//这里是陀螺仪原始数据，右前上转化到前右下
                         int16_val(data, 4),
                         -int16_val(data, 6));
         gyro *= _gyro_scale;//量程转化，变成弧度
 
-        _rotate_and_correct_accel(_accel_instance, accel);//把加速度数据转换成重力加速度数据，坐标系是NED
-        _rotate_and_correct_gyro(_gyro_instance, gyro);//获取陀螺仪旋转后数据
+        _rotate_and_correct_accel(_accel_instance, accel);//旋转和校准加速度
+        _rotate_and_correct_gyro(_gyro_instance, gyro);   //旋转和校准陀螺仪
 
+        /*---IMU发布数据----*/
         _notify_new_accel_raw_sample(_accel_instance, accel, 0, fsync_set);//发布加速度数据
         _notify_new_gyro_raw_sample(_gyro_instance, gyro);//发布陀螺仪数据
 
-        _temp_filtered = _temp_filter.apply(temp);
+        _temp_filtered = _temp_filter.apply(temp);/*温度滤波器*/
     }
     return true;
 }
@@ -550,13 +559,15 @@ bool AP_InertialSensor_Invensense::_accumulate_sensor_rate_sampling(uint8_t *sam
     return ret;
 }
 
+/*函数功能：读取buffer相关操作，计算IMU相关*/
 void AP_InertialSensor_Invensense::_read_fifo()
 {
     uint8_t n_samples;
     uint16_t bytes_read;
-    uint8_t *rx = _fifo_buffer;
+    uint8_t *rx = _fifo_buffer;/*定义指针指向FIFO_buffer*/
     bool need_reset = false;
 
+   /*还不能读取寄存器，跳转检测寄存器*/
     if (!_block_read(MPUREG_FIFO_COUNTH, rx, 2)) {
         goto check_registers;
     }
@@ -566,6 +577,7 @@ void AP_InertialSensor_Invensense::_read_fifo()
 
     if (n_samples == 0) {
         /* Not enough data in FIFO */
+        /*没有足够的数据在FIFO*/
         goto check_registers;
     }
 
@@ -575,9 +587,13 @@ void AP_InertialSensor_Invensense::_read_fifo()
       the ones at the end of the FIFO, so clear those with a reset
       once we've read the first 24. Reading 24 gives us the normal
       number of samples for fast sampling at 400Hz
+      *测试表明，如果我们有超过32个样本在FIFO里，那将会有一些样本是损坏的，
+       这些总是在FIFO后面那些数据，所以清除这些且重置一下FIFO，一旦我们读取
+       到前24个.读取24个给我们一个常见的样本在以400Hz的快速采样下。
 
       On I2C with the much lower clock rates we need a lower threshold
       or we may never catch up
+      *在时钟速率较低的I2C上，我们需要一个较低的阈值，否则我们可能永远也捕获数据  
      */
     if (_dev->bus_type() == AP_HAL::Device::BUS_TYPE_I2C) {
         if (n_samples > 4) {
@@ -623,13 +639,14 @@ void AP_InertialSensor_Invensense::_read_fifo()
                 break;
             }
         } else {
-            if (!_accumulate(rx, n)) {//计算传感器数据
-                break;
+            if (!_accumulate(rx, n)) {/**--进入这个函数，计算传感器数据----**/
+                break;/*如果上面无法计算，则直接退出死循环*/
             }
         }
         n_samples -= n;
     }
-
+     
+    /*如果需要重置，则直接重置*/
     if (need_reset) {
         //debug("fifo reset n_samples %u", bytes_read/MPU_SAMPLE_SIZE);
         _fifo_reset();
@@ -647,6 +664,7 @@ check_registers:
 
 /*
   fetch temperature in order to detect FIFO sync errors
+  获取温度，以检测FIFO同步错误  
 */
 bool AP_InertialSensor_Invensense::_check_raw_temp(int16_t t2)
 {
@@ -681,6 +699,7 @@ void AP_InertialSensor_Invensense::_register_write(uint8_t reg, uint8_t val, boo
 
 /*
   set the DLPF filter frequency. Assumes caller has taken semaphore
+  设置下采样滤波器频率，假设调用时已经释放信号量
  */
 void AP_InertialSensor_Invensense::_set_filter_register(void)
 {
@@ -694,10 +713,11 @@ void AP_InertialSensor_Invensense::_set_filter_register(void)
 #endif
 
     // assume 1kHz sampling to start
-    _fifo_downsample_rate = 1;
+    _fifo_downsample_rate = 1;/*_fifo_downsample_rate理解为下采样的程度大小，1的话表示按原采样频率采样*/
     _backend_rate_hz = 1000;
     
     if (enable_fast_sampling(_accel_instance)) {
+        /*能不能fast_sample看这个满不满足*/
         _fast_sampling = (_mpu_type >= Invensense_MPU9250 && _dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI);
         if (_fast_sampling) {
             if (get_sample_rate_hz() <= 1000) {
@@ -708,12 +728,14 @@ void AP_InertialSensor_Invensense::_set_filter_register(void)
                 _fifo_downsample_rate = 2;
             }
             // calculate rate we will be giving samples to the backend
+            /*计算一下我们应该给后端多大的采样频率*/
             _backend_rate_hz *= (8 / _fifo_downsample_rate);
 
             // for logging purposes set the oversamping rate
+            /*日志目的而设置过采样*/
             _set_accel_oversampling(_accel_instance, _fifo_downsample_rate/2);
             _set_gyro_oversampling(_gyro_instance, _fifo_downsample_rate);
-
+            /*使能采样速率*/
             _set_accel_sensor_rate_sampling_enabled(_accel_instance, true);
             _set_gyro_sensor_rate_sampling_enabled(_gyro_instance, true);
 

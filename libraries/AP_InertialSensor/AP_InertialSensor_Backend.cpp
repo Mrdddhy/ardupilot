@@ -49,14 +49,16 @@ void AP_InertialSensor_Backend::_set_gyro_oversampling(uint8_t instance, uint8_t
 
 /*
   update the sensor rate for FIFO sensors
-
+*更新FIFO传感器的速率
   FIFO sensors produce samples at a fixed rate, but the clock in the
   sensor may vary slightly from the system clock. This slowly adjusts
   the rate to the observed rate
+*先进先出传感器以固定的速率产生样本，但是传感器时钟可能与系统时钟略有变化，
+ 这慢慢调整速率与观测速率之比
 */
 void AP_InertialSensor_Backend::_update_sensor_rate(uint16_t &count, uint32_t &start_us, float &rate_hz) const
 {
-    uint32_t now = AP_HAL::micros();
+    uint32_t now = AP_HAL::micros();/*获取当前的时间*/
     if (start_us == 0) {
         count = 0;
         start_us = now;
@@ -84,16 +86,21 @@ void AP_InertialSensor_Backend::_update_sensor_rate(uint16_t &count, uint32_t &s
     }
 }
 
+/*函数功能：旋转和校准加速度
+  输入参数1：加速度计实例
+  输入参数2：加速度计数据：单位为g
+  */
 void AP_InertialSensor_Backend::_rotate_and_correct_accel(uint8_t instance, Vector3f &accel) 
 {
     /*
       accel calibration is always done in sensor frame with this
       version of the code. That means we apply the rotation after the
       offsets and scaling.
+      这版代码里面加速度计校准总是要做的，这就意味着我们在做完偏移和尺度校准之后再进行旋转
      */
 
     // rotate for sensor orientation
-    //对加速度数据进行旋转
+    // 对传感器方向做旋转
     accel.rotate(_imu._accel_orientation[instance]);
     
     // apply offsets
@@ -101,12 +108,14 @@ void AP_InertialSensor_Backend::_rotate_and_correct_accel(uint8_t instance, Vect
     accel -= _imu._accel_offset[instance];
 
     // apply scaling
+    // 乘以尺度因子
     const Vector3f &accel_scale = _imu._accel_scale[instance].get();
     accel.x *= accel_scale.x;
     accel.y *= accel_scale.y;
     accel.z *= accel_scale.z;
 
     // rotate to body frame
+    //旋转到机体系
     if (_imu._board_orientation == ROTATION_CUSTOM && _imu._custom_rotation) {
         accel = *_imu._custom_rotation * accel;
     } else {
@@ -321,7 +330,12 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     }
 }
 
-/*函数功能：通知数据到前端*/
+/*函数功能：通知数据到前端
+  参数1：实例
+  参数2：加速度原始数据
+  参数3：采样频率us
+  参数4：
+*/
 void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
                                                              const Vector3f &accel,
                                                              uint64_t sample_us,
@@ -331,10 +345,12 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
         return;
     }
     float dt;
-
+    
+    /*更新加速度计实例对应的采样起始时间、原始采样时间*/
     _update_sensor_rate(_imu._sample_accel_count[instance], _imu._sample_accel_start_us[instance],
                         _imu._accel_raw_sample_rates[instance]);
 
+    /*更新上一采样时间*/
     uint64_t last_sample_us = _imu._accel_last_sample_us[instance];
 
     /*
@@ -344,18 +360,25 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
       sensors don't bunch up samples, but also tend to vary in actual
       rate, so we use the provided sample_us to get the deltaT. The
       difference between the two is whether sample_us is provided.
+      *我们有两类传感器。基于FIFO的传感器产生的数据在一个非常可预测的总体速率，
+      但是数据是成群的，所以我们使用提供的样本速率deltaT.
+      NON-FIFO传感器不会聚集样本，但也往往在实际速率变化，
+      所以我们使用提供的sample_us来获得deltaT,两者之间的区别在于是否提供了sample_us.
+
+      * sample_us = 0，即采用原始采样方式计算dt
      */
     if (sample_us != 0 && _imu._accel_last_sample_us[instance] != 0) {
         dt = (sample_us - _imu._accel_last_sample_us[instance]) * 1.0e-6f;
         _imu._accel_last_sample_us[instance] = sample_us;
     } else {
         // don't accept below 100Hz
+        /*不超过低于100Hz*/
         if (_imu._accel_raw_sample_rates[instance] < 100) {
             return;
         }
 
-        dt = 1.0f / _imu._accel_raw_sample_rates[instance];
-        _imu._accel_last_sample_us[instance] = AP_HAL::micros64();
+        dt = 1.0f / _imu._accel_raw_sample_rates[instance];/*用原始采样速率方式计算增量时间*/
+        _imu._accel_last_sample_us[instance] = AP_HAL::micros64();/*将当前时间设置为加速度计上次采样时刻*/
     }
 
 #if AP_MODULE_SUPPORTED
@@ -368,27 +391,29 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
     {
         WITH_SEMAPHORE(_sem);
 
-        uint64_t now = AP_HAL::micros64();
+        uint64_t now = AP_HAL::micros64();/*获取当前时间*/
 
         if (now - last_sample_us > 100000U) {
             // zero accumulator if sensor was unhealthy for 0.1s
-            _imu._delta_velocity_acc[instance].zero();
-            _imu._delta_velocity_acc_dt[instance] = 0;
+            /*累积器置0如果传感器不健康超过0.1s*/
+            _imu._delta_velocity_acc[instance].zero();/*增量速度置0*/
+            _imu._delta_velocity_acc_dt[instance] = 0;/*增量速度计算dt=0*/
             dt = 0;
         }
         
         // delta velocity
-        _imu._delta_velocity_acc[instance] += accel * dt;
-        _imu._delta_velocity_acc_dt[instance] += dt;
+        _imu._delta_velocity_acc[instance] += accel * dt;/*计算增量速度*/
+        _imu._delta_velocity_acc_dt[instance] += dt;/*增量时间计算*/
 
-        _imu._accel_filtered[instance] = _imu._accel_filter[instance].apply(accel);
+        _imu._accel_filtered[instance] = _imu._accel_filter[instance].apply(accel);/*加速度数据滤波*/
+
         if (_imu._accel_filtered[instance].is_nan() || _imu._accel_filtered[instance].is_inf()) {
             _imu._accel_filter[instance].reset();
         }
 
-        _imu.set_accel_peak_hold(instance, _imu._accel_filtered[instance]);/*得到滤波后的数据*/
+        _imu.set_accel_peak_hold(instance, _imu._accel_filtered[instance]);/*峰值保持检测*/
 
-        _imu._new_accel_data[instance] = true;
+        _imu._new_accel_data[instance] = true;/*设置新的加速度计数据标志位*/
     }
 
     if (!_imu.batchsampler.doing_post_filter_logging()) {

@@ -113,6 +113,7 @@ public:
 
 protected:
     // access to frontend
+    /*前端接口*/
     AP_InertialSensor &_imu;
 
     // semaphore for access to shared frontend data
