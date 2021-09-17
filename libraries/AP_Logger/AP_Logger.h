@@ -188,6 +188,7 @@ public:
     AP_Logger &operator=(const AP_Logger&) = delete;
 
     // get singleton instance
+    /*命名空间里 定义接口函数来调用静态函数成员的*/
     static AP_Logger *get_singleton(void) {
         return _singleton;
     }
@@ -450,7 +451,7 @@ private:
 
     void backend_starting_new_log(const AP_Logger_Backend *backend);
 
-    static AP_Logger *_singleton;
+    static AP_Logger *_singleton;/*静态成员函数*/
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     bool validate_structure(const struct LogStructure *logstructure, int16_t offset);

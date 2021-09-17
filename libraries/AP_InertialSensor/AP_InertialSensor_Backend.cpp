@@ -201,9 +201,10 @@ void AP_InertialSensor_Backend::_notify_new_gyro_raw_sample(uint8_t instance,
     }
     
     // compute delta angle
+    /*计算增量角度*/
     Vector3f delta_angle = (gyro + _imu._last_raw_gyro[instance]) * 0.5f * dt;
 
-    // compute coning correction
+    // compute coning correction(计算锥进校正)
     // see page 26 of:
     // Tian et al (2010) Three-loop Integration of GPS and Strapdown INS with Coning and Sculling Compensation
     // Available: http://www.sage.unsw.edu.au/snap/publications/tian_etal2010b.pdf
@@ -306,6 +307,9 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     _imu._accel_healthy[instance] = true;
 
     // publish delta velocity
+    /*发布增量速度，增量时间
+      设置增量速度有效性
+    */
     _imu._delta_velocity[instance] = _imu._delta_velocity_acc[instance];
     _imu._delta_velocity_dt[instance] = _imu._delta_velocity_acc_dt[instance];
     _imu._delta_velocity_valid[instance] = true;
@@ -544,7 +548,8 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance)
         _last_gyro_filter_hz = _gyro_filter_cutoff();
     }
 
-    // possily update the harmonic notch filter parameters
+    // possibly update the harmonic notch filter parameters
+    /*有可能更新谐波陷波参数*/
     if (!is_equal(_last_harmonic_notch_bandwidth_hz, gyro_harmonic_notch_bandwidth_hz()) ||
         !is_equal(_last_harmonic_notch_attenuation_dB, gyro_harmonic_notch_attenuation_dB()) ||
         sensors_converging()) {
@@ -556,7 +561,8 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance)
         _imu._gyro_harmonic_notch_filter[instance].update(gyro_harmonic_notch_center_freq_hz());
         _last_harmonic_notch_center_freq_hz = gyro_harmonic_notch_center_freq_hz();
     }
-    // possily update the notch filter parameters
+    // possibly update the notch filter parameters
+    /*有可能更新陷波参数*/
     if (!is_equal(_last_notch_center_freq_hz, _gyro_notch_center_freq_hz()) ||
         !is_equal(_last_notch_bandwidth_hz, _gyro_notch_bandwidth_hz()) ||
         !is_equal(_last_notch_attenuation_dB, _gyro_notch_attenuation_dB()) ||
@@ -578,6 +584,9 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance)
     if ((1U<<instance) & _imu.imu_kill_mask) {
         return;
     }
+    /*如果有新的加速度计数据标志位
+      发布滤波的数据并且修改标志位
+    */
     if (_imu._new_accel_data[instance]) {
         _publish_accel(instance, _imu._accel_filtered[instance]);
         _imu._new_accel_data[instance] = false;
@@ -585,6 +594,9 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance)
     
     // possibly update filter frequency
     // 可能更新滤波频率
+    /*如果加速度计滤波的截止频率不等于上次加速度计的滤波频率
+      设置对应的截止频率并将当前的截止频率赋值给上次的加速度计滤波频率
+    */
     if (_last_accel_filter_hz != _accel_filter_cutoff()) {
         _imu._accel_filter[instance].set_cutoff_frequency(_accel_raw_sample_rate(instance), _accel_filter_cutoff());
         _last_accel_filter_hz = _accel_filter_cutoff();

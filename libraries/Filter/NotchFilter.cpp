@@ -17,6 +17,7 @@
 
 /*
    calculate the attenuation and quality factors of the filter
+   计算滤波器的衰减和质量因子
  */
 template <class T>
 void NotchFilter<T>::calculate_A_and_Q(float center_freq_hz, float bandwidth_hz, float attenuation_dB, float& A, float& Q) {
@@ -31,15 +32,17 @@ void NotchFilter<T>::calculate_A_and_Q(float center_freq_hz, float bandwidth_hz,
 
 /*
   initialise filter
+  初始化滤波器
  */
 template <class T>
 void NotchFilter<T>::init(float sample_freq_hz, float center_freq_hz, float bandwidth_hz, float attenuation_dB)
 {
     // check center frequency is in the allowable range
+    /*检查中心频率是否在允许的范围内*/
     if ((center_freq_hz > 0.5 * bandwidth_hz) && (center_freq_hz < 0.5 * sample_freq_hz)) {
         float A, Q;
-        calculate_A_and_Q(center_freq_hz, bandwidth_hz, attenuation_dB, A, Q);
-        init_with_A_and_Q(sample_freq_hz, center_freq_hz, A, Q);
+        calculate_A_and_Q(center_freq_hz, bandwidth_hz, attenuation_dB, A, Q);/*根据中心频率和带宽频率计算A和Q*/
+        init_with_A_and_Q(sample_freq_hz, center_freq_hz, A, Q);/*根据A和Q计算滤波器的几个系数*/
     } else {
         initialised = false;
     }
@@ -49,7 +52,7 @@ template <class T>
 void NotchFilter<T>::init_with_A_and_Q(float sample_freq_hz, float center_freq_hz, float A, float Q)
 {
     if ((center_freq_hz > 0.0) && (center_freq_hz < 0.5 * sample_freq_hz) && (Q > 0.0)) {
-        float omega = 2.0 * M_PI * center_freq_hz / sample_freq_hz;
+        float omega = 2.0 * M_PI * center_freq_hz / sample_freq_hz;/*要滤除信号的频率rad*/
         float alpha = sinf(omega) / (2 * Q);
         b0 =  1.0 + alpha*sq(A);
         b1 = -2.0 * cosf(omega);
@@ -65,6 +68,7 @@ void NotchFilter<T>::init_with_A_and_Q(float sample_freq_hz, float center_freq_h
 
 /*
   apply a new input sample, returning new output
+  陷波滤波器的输出
  */
 template <class T>
 T NotchFilter<T>::apply(const T &sample)

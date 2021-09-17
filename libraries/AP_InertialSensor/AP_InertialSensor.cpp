@@ -670,22 +670,26 @@ void AP_InertialSensor::init(uint16_t sample_rate)
     _sample_period_usec = 1000*1000UL / _sample_rate;
 
     // establish the baseline time between samples
+    /*建立样本之间的基准时间*/
     _delta_time = 0;
     _next_sample_usec = 0;
     _last_sample_usec = 0;
     _have_sample = false;
 
     // initialise IMU batch logging
+    /*初始化IMU批处理日志*/
     batchsampler.init();
 
     // the center frequency of the harmonic notch is always taken from the calculated value so that it can be updated
     // dynamically, the calculated value is always some multiple of the configured center frequency, so start with the
     // configured value
+    /*谐波陷波器的中心频率总是可以从计算中取，以便动态更新，计算值总是配置中心频率的几倍，所以从配置值开始*/
     _calculated_harmonic_notch_freq_hz = _harmonic_notch_filter.center_freq_hz();
 
     for (uint8_t i=0; i<get_gyro_count(); i++) {
         _gyro_harmonic_notch_filter[i].allocate_filters(_harmonic_notch_filter.harmonics());
         // initialise default settings, these will be subsequently changed in AP_InertialSensor_Backend::update_gyro()
+        /*初始化默认设置，这些将随后在AP_InertialSensor_Backend::update_gyro()中更改 */
         _gyro_harmonic_notch_filter[i].init(_gyro_raw_sample_rates[i], _calculated_harmonic_notch_freq_hz,
              _harmonic_notch_filter.bandwidth_hz(), _harmonic_notch_filter.attenuation_dB());
     }
@@ -922,9 +926,10 @@ bool AP_InertialSensor::_calculate_trim(const Vector3f &accel_sample, float& tri
 void
 AP_InertialSensor::init_gyro()
 {
-    _init_gyro();
+    _init_gyro();/*校准初始陀螺仪*/
 
     // save calibration
+    /*保存校准参数到EEPROM*/
     _save_gyro_calibration();
 }
 
@@ -1106,30 +1111,36 @@ AP_InertialSensor::_init_gyro()
     Vector3f last_average[INS_MAX_INSTANCES], best_avg[INS_MAX_INSTANCES];
     Vector3f new_gyro_offset[INS_MAX_INSTANCES];
     float best_diff[INS_MAX_INSTANCES];
-    bool converged[INS_MAX_INSTANCES];
+    bool converged[INS_MAX_INSTANCES];/*实例是否收敛*/
 
     // exit immediately if calibration is already in progress
+    /*如果正在校准，则立即退出*/
     if (_calibrating) {
         return;
     }
 
     // record we are calibrating
+    /*记录一下我们正在校准*/
     _calibrating = true;
 
     // flash leds to tell user to keep the IMU still
+    /*闪烁的leds告诉用户保持IMU静止*/
     AP_Notify::flags.initialising = true;
 
     // cold start
+    /*冷启动*/
     hal.console->printf("Init Gyro");
 
     /*
       we do the gyro calibration with no board rotation. This avoids
       having to rotate readings during the calibration
+      我们进行陀螺仪校准时没有做板子的旋转，这避免在校准中不得不旋转读数
     */
     enum Rotation saved_orientation = _board_orientation;
     _board_orientation = ROTATION_NONE;
 
     // remove existing gyro offsets
+    /*清除已有的陀螺仪偏差*/
     for (uint8_t k=0; k<num_gyros; k++) {
         _gyro_offset[k].set(Vector3f());
         new_gyro_offset[k].zero();
@@ -1146,11 +1157,13 @@ AP_InertialSensor::_init_gyro()
     // the strategy is to average 50 points over 0.5 seconds, then do it
     // again and see if the 2nd average is within a small margin of
     // the first
+    /*策略是在0.5秒内平均50个点，然后再做一次，看看第2个点与第1个点的差距是否很小*/
 
     uint8_t num_converged = 0;
 
     // we try to get a good calibration estimate for up to 30 seconds
     // if the gyros are stable, we should get it in 1 second
+    /*我们试图在30秒内得到一个很好的校准估计如果陀螺是稳定的，我们应该在1秒内得到它 */
     for (int16_t j = 0; j <= 30*4 && num_converged < num_gyros; j++) {
         Vector3f gyro_sum[INS_MAX_INSTANCES], gyro_avg[INS_MAX_INSTANCES], gyro_diff[INS_MAX_INSTANCES];
         Vector3f accel_start;
@@ -1159,14 +1172,15 @@ AP_InertialSensor::_init_gyro()
 
         EXPECT_DELAY_MS(1000);
 
-        memset(diff_norm, 0, sizeof(diff_norm));
+        memset(diff_norm, 0, sizeof(diff_norm));/*初始化存放差值diff_norm*/
 
         hal.console->printf("*");
 
         for (uint8_t k=0; k<num_gyros; k++) {
-            gyro_sum[k].zero();
+            gyro_sum[k].zero();/*初始化陀螺仪数据总和*/
         }
-        accel_start = get_accel(0);
+        accel_start = get_accel(0);/*先初始化加速度计的开始值*/
+        /*采集50次，求陀螺仪数据之和*/
         for (i=0; i<50; i++) {
             update();
             for (uint8_t k=0; k<num_gyros; k++) {
@@ -1175,21 +1189,22 @@ AP_InertialSensor::_init_gyro()
             hal.scheduler->delay(5);
         }
 
-        Vector3f accel_diff = get_accel(0) - accel_start;
+        Vector3f accel_diff = get_accel(0) - accel_start;/*50次之后加速度计采集的数据与之前的差值*/
         if (accel_diff.length() > 0.2f) {
             // the accelerometers changed during the gyro sum. Skip
             // this sample. This copes with doing gyro cal on a
             // steadily moving platform. The value 0.2 corresponds
             // with around 5 degrees/second of rotation.
-            continue;
+            continue;/*如果加速度计不满足则直接跳出这次循环，开始下一次*/
         }
 
+        /*求陀螺仪数据平均值*/
         for (uint8_t k=0; k<num_gyros; k++) {
             gyro_avg[k] = gyro_sum[k] / i;
-            gyro_diff[k] = last_average[k] - gyro_avg[k];
-            diff_norm[k] = gyro_diff[k].length();
+            gyro_diff[k] = last_average[k] - gyro_avg[k];/*两次平均值的差值*/
+            diff_norm[k] = gyro_diff[k].length();/*对差值求模值*/
         }
-
+        /*求最好的平均值*/
         for (uint8_t k=0; k<num_gyros; k++) {
             if (best_diff[k] < 0) {
                 best_diff[k] = diff_norm[k];
@@ -1214,6 +1229,7 @@ AP_InertialSensor::_init_gyro()
 
     // we've kept the user waiting long enough - use the best pair we
     // found so far
+    /*我们已经让用户等待了很长时间——使用我们目前找到的最好的一对 */
     hal.console->printf("\n");
     for (uint8_t k=0; k<num_gyros; k++) {
         if (!converged[k]) {
@@ -1225,18 +1241,21 @@ AP_InertialSensor::_init_gyro()
             // flag calibration as failed for this gyro
             _gyro_cal_ok[k] = false;
         } else {
-            _gyro_cal_ok[k] = true;
-            _gyro_offset[k] = new_gyro_offset[k];
+            _gyro_cal_ok[k] = true;/*校准标志=true*/
+            _gyro_offset[k] = new_gyro_offset[k];/*校准后的陀螺仪偏移*/
         }
     }
 
     // restore orientation
+    /*还原方向*/
     _board_orientation = saved_orientation;
 
     // record calibration complete
+    /*标志不在进行校准中*/
     _calibrating = false;
 
     // stop flashing leds
+    /*停止闪烁*/
     AP_Notify::flags.initialising = false;
 }
 
@@ -1263,6 +1282,7 @@ void AP_InertialSensor::update(void)
 {
     // during initialisation update() may be called without
     // wait_for_sample(), and a wait is implied
+    /*在初始化过程中，可以不使用wait_for_sample()调用update()，并隐含等待  */
     wait_for_sample();
 
     if (!_hil_mode) {
@@ -1270,39 +1290,43 @@ void AP_InertialSensor::update(void)
             // mark sensors unhealthy and let update() in each backend
             // mark them healthy via _publish_gyro() and
             // _publish_accel()
-            _gyro_healthy[i] = false;
-            _accel_healthy[i] = false;
-            _delta_velocity_valid[i] = false;
-            _delta_angle_valid[i] = false;
+            /*标记传感器不健康和让函数update()在每个的后端，
+             *标记传感器健康通过 _publish_gyro() 和_publish_accel()
+            */
+            _gyro_healthy[i] = false;/*陀螺仪健康否*/
+            _accel_healthy[i] = false;/*加速度计健康否*/
+            _delta_velocity_valid[i] = false;/*速度增量有效性否*/
+            _delta_angle_valid[i] = false;/*角度增量有效性否*/
         }
         for (uint8_t i=0; i<_backend_count; i++) {
             _backends[i]->update();//数据更新，2.5ms一次
         }
 
         // clear accumulators
+        /*清除累加器*/
         for (uint8_t i = 0; i < INS_MAX_INSTANCES; i++) {
             _delta_velocity_acc[i].zero();
             _delta_velocity_acc_dt[i] = 0;
             _delta_angle_acc[i].zero();
             _delta_angle_acc_dt[i] = 0;
         }
-
+        /*如果没有启动误差标志位*/
         if (!_startup_error_counts_set) {
             for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
-                _accel_startup_error_count[i] = _accel_error_count[i];
+                _accel_startup_error_count[i] = _accel_error_count[i];/*记录启动误差记录个数*/
                 _gyro_startup_error_count[i] = _gyro_error_count[i];
             }
 
             if (_startup_ms == 0) {
                 _startup_ms = AP_HAL::millis();
             } else if (AP_HAL::millis()-_startup_ms > 2000) {
-                _startup_error_counts_set = true;
+                _startup_error_counts_set = true;/*设置对应的标志位*/
             }
         }
 
         for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
             if (_accel_error_count[i] < _accel_startup_error_count[i]) {
-                _accel_startup_error_count[i] = _accel_error_count[i];
+                _accel_startup_error_count[i] = _accel_error_count[i];/*将误差个数赋值给启动误差个数*/
             }
             if (_gyro_error_count[i] < _gyro_startup_error_count[i]) {
                 _gyro_startup_error_count[i] = _gyro_error_count[i];
@@ -1311,6 +1335,7 @@ void AP_InertialSensor::update(void)
 
         // adjust health status if a sensor has a non-zero error count
         // but another sensor doesn't.
+        /*如果一个传感器有非零错误计数而另一个传感器没有，则调整健康状态*/
         bool have_zero_accel_error_count = false;
         bool have_zero_gyro_error_count = false;
         for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {

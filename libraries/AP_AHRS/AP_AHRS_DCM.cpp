@@ -172,14 +172,17 @@ AP_AHRS_DCM::matrix_update(float _G_Dt)
 /*
  *  reset the DCM matrix and omega. Used on ground start, and on
  *  extreme errors in the matrix
+ * 重置DCM矩阵。 用于地面启动，以及矩阵中的极端误差  
  */
 void
 AP_AHRS_DCM::reset(bool recover_eulers)
 {
     // support locked access functions to AHRS data
+    /*支持AHRS数据的锁定访问功能*/
     WITH_SEMAPHORE(_rsem);
     
     // reset the integration terms
+    /*重置积分项*/
     _omega_I.zero();
     _omega_P.zero();
     _omega_yaw_P.zero();
@@ -202,14 +205,18 @@ AP_AHRS_DCM::reset(bool recover_eulers)
 
         // Use the measured accel due to gravity to calculate an initial
         // roll and pitch estimate
-
+        /*利用测量到的重力加速度来计算初始滚转和俯仰估计  */
         AP_InertialSensor &_ins = AP::ins();
 
         // Get body frame accel vector
+        /*获取机体的加速度向量*/
         Vector3f initAccVec = _ins.get_accel();
         uint8_t counter = 0;
 
         // the first vector may be invalid as the filter starts up
+        /*第一个向量可能在过滤器启动时无效,这里设置条件也就是加速度计数据模长不满足条件以及计数个数小于20时
+          需要等待一下再更新获取加速度计数据
+        */
         while ((initAccVec.length() < 9.0f || initAccVec.length() > 11) && counter++ < 20) {
             _ins.wait_for_sample();
             _ins.update();

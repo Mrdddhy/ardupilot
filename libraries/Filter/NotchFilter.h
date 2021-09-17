@@ -36,13 +36,14 @@ public:
     void reset();
 
     // calculate attenuation and quality from provided center frequency and bandwidth
+    // 根据给定的中心频率和带宽来计算衰减分贝A和Q因子
     static void calculate_A_and_Q(float center_freq_hz, float bandwidth_hz, float attenuation_dB, float& A, float& Q); 
 
 private:
 
     bool initialised;
-    float b0, b1, b2, a1, a2, a0_inv;
-    T ntchsig, ntchsig1, ntchsig2, signal2, signal1;
+    float b0, b1, b2, a1, a2, a0_inv;//Notch Filter的输出公式中的核心系数
+    T ntchsig, ntchsig1, ntchsig2, signal2, signal1;//2阶的Notch Filter的输入输出信号
 };
 
 /*
@@ -59,10 +60,11 @@ public:
     uint8_t enabled(void) const { return _enable; }
     
 protected:
-    AP_Int8 _enable;
-    AP_Float _center_freq_hz;
-    AP_Float _bandwidth_hz;
-    AP_Float _attenuation_dB;
+/*预先设定的几个参数*/
+    AP_Int8 _enable;  /*该滤波器使能*/
+    AP_Float _center_freq_hz;/*想要滤除的信号的中心频率*/
+    AP_Float _bandwidth_hz;/*想要滤除的信号的带宽*/
+    AP_Float _attenuation_dB;/*想要滤除的信号的分贝*/
 };
 
 typedef NotchFilter<float> NotchFilterFloat;

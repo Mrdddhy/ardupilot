@@ -103,7 +103,7 @@ void HarmonicNotchFilter<T>::init(float sample_freq_hz, float center_freq_hz, fl
     }
 
     _sample_freq_hz = sample_freq_hz;
-    const float nyquist_limit = sample_freq_hz * 0.48f;
+    const float nyquist_limit = sample_freq_hz * 0.48f;/*定义了0.48倍的信号采样频率*/
 
     // adjust the fundamental center frequency to be in the allowable range
     center_freq_hz = constrain_float(center_freq_hz, bandwidth_hz * 0.52f, nyquist_limit);

@@ -631,10 +631,11 @@ bool NavEKF2::InitialiseFilter(void)
     imuSampleTime_us = AP_HAL::micros64();
 
     // remember expected frame time
+    /*记住预期帧时间*/
     _frameTimeUsec = 1e6 / ins.get_sample_rate();
 
     // expected number of IMU frames per prediction
-    /*算有多少个预测imu方程，因为这里有好几组imu,都可以进行ekf*/
+    /*每次预测所需的IMU帧数*/
     _framesPerPrediction = uint8_t((EKF_TARGET_DT / (_frameTimeUsec * 1.0e-6) + 0.5));
 
     // see if we will be doing logging
@@ -668,7 +669,7 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         // try to allocate from CCM RAM, fallback to Normal RAM if not available or full
-        /*尝试从CCM RAM分配，退路就是到常规的RAM分配如果不可用或者已经使用满*/
+        /*尝试从CCM RAM分配，如果不可用或者已经使用满，退路就是到常规的RAM分配*/
         core = (NavEKF2_core*)hal.util->malloc_type(sizeof(NavEKF2_core)*num_cores, AP_HAL::Util::MEM_FAST);
         if (core == nullptr) {
             _enable.set(0);
@@ -695,6 +696,7 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         // Set the primary initially to be the lowest index
+        /*最初将主索引设置为最低索引*/
         primary = 0;
     }
 
@@ -710,6 +712,7 @@ bool NavEKF2::InitialiseFilter(void)
     }
 
     // zero the structs used capture reset events
+    /*将捕获重置事件所使用的结构置零*/
     memset(&yaw_reset_data, 0, sizeof(yaw_reset_data));
     memset((void *)&pos_reset_data, 0, sizeof(pos_reset_data));
     memset(&pos_down_reset_data, 0, sizeof(pos_down_reset_data));
