@@ -303,7 +303,7 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     if ((1U<<instance) & _imu.imu_kill_mask) {
         return;
     }
-    _imu._accel[instance] = accel;
+    _imu._accel[instance] = accel;/*_imu._accel被发布出去，最终被放置在Vector3f _accel[INS_MAX_INSTANCE]*/
     _imu._accel_healthy[instance] = true;
 
     // publish delta velocity
@@ -576,6 +576,7 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance)
 
 /*
   common accel update function for all backends
+  通用的accel更新功能为所有后端
  */
 void AP_InertialSensor_Backend::update_accel(uint8_t instance)
 {    
@@ -588,7 +589,7 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance)
       发布滤波的数据并且修改标志位
     */
     if (_imu._new_accel_data[instance]) {
-        _publish_accel(instance, _imu._accel_filtered[instance]);
+        _publish_accel(instance, _imu._accel_filtered[instance]);/*发布加速度计数据，滤波后的*/
         _imu._new_accel_data[instance] = false;
     }
     

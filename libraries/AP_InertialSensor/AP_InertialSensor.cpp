@@ -1299,7 +1299,7 @@ void AP_InertialSensor::update(void)
             _delta_angle_valid[i] = false;/*角度增量有效性否*/
         }
         for (uint8_t i=0; i<_backend_count; i++) {
-            _backends[i]->update();//数据更新，2.5ms一次
+            _backends[i]->update();//------数据更新，2.5ms一次------
         }
 
         // clear accumulators
