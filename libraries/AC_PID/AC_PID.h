@@ -20,6 +20,7 @@ class AC_PID {
 public:
 
     // Constructor for PID
+    /*参数说明：initial_p/initial_i/initial_d/初始定义的PID参数;initial_ff:前馈因子；initial_imax：Ki最大值；initial_filt_T_hz:目标滤波器；dt:采样间隔*/
     AC_PID(float initial_p, float initial_i, float initial_d, float initial_ff, float initial_imax, float initial_filt_T_hz, float initial_filt_E_hz, float initial_filt_D_hz, float dt);
 
     // set_dt - set time step in seconds

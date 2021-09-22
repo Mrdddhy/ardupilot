@@ -21,7 +21,7 @@
  */
 
 #include "AP_AHRS.h"
-
+/*AP_AHRS_View类 是AP_AHRS类的一个友元类，可以访问到AP_AHRS类中绝大部分数据*/
 class AP_AHRS_View
 {
 public:

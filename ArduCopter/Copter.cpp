@@ -242,7 +242,7 @@ void Copter::fast_loop()
     ins.update();//立即更新INS以获得当前的陀螺仪数据填充，传感器更新
 
     // run low level rate controllers that only require IMU data
-    attitude_control->rate_controller_run();//运行低频率角速度控制器
+    attitude_control->rate_controller_run();//运行低频率角速度控制器400hz
 
     // send outputs to the motors library immediately
     motors_output();//立即将输出发送到电机库

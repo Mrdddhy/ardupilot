@@ -45,33 +45,34 @@
 
 class AC_AttitudeControl {
 public:
-    AC_AttitudeControl( AP_AHRS_View &ahrs,
-                        const AP_Vehicle::MultiCopter &aparm,
-                        AP_Motors& motors,
-                        float dt) :
+    AC_AttitudeControl( AP_AHRS_View &ahrs,//姿态传感器
+                        const AP_Vehicle::MultiCopter &aparm,//最大角度
+                        AP_Motors& motors,//控制的电机
+                        float dt) ://积分采样时间
         _p_angle_roll(AC_ATTITUDE_CONTROL_ANGLE_P),
         _p_angle_pitch(AC_ATTITUDE_CONTROL_ANGLE_P),
         _p_angle_yaw(AC_ATTITUDE_CONTROL_ANGLE_P),
-        _dt(dt),
-        _angle_boost(0),
-        _use_sqrt_controller(true),
+        _dt(dt),//积分采样时间_dt从接收的参数中获得初始化的默认值
+        _angle_boost(0),//用于倾斜补偿的油门增加_angle_boost设置为0
+        _use_sqrt_controller(true),//指定姿态控制器在姿态校正中开启平方根控制器，确保对P项进行整定
         _throttle_rpy_mix_desired(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT),
         _throttle_rpy_mix(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT),
         _ahrs(ahrs),
         _aparm(aparm),
-        _motors(motors)
+        _motors(motors)//获得输入参数的给定值
         {
-            AP_Param::setup_object_defaults(this, var_info);
+            AP_Param::setup_object_defaults(this, var_info);//构造函数内部实现了对于参数列表的加载，具体的var_info参数列表在AC_AttitudeControl.h
         }
 
     // Empty destructor to suppress compiler warning
     virtual ~AC_AttitudeControl() {}
 
     // pid accessors
+    /*角度P控制器对象的实现和参数获取是在基类具体实现的*/
     AC_P& get_angle_roll_p() { return _p_angle_roll; }
     AC_P& get_angle_pitch_p() { return _p_angle_pitch; }
     AC_P& get_angle_yaw_p() { return _p_angle_yaw; }
-    virtual AC_PID& get_rate_roll_pid() = 0;
+    virtual AC_PID& get_rate_roll_pid() = 0;/*为派生类提供了虚函数接口*/
     virtual AC_PID& get_rate_pitch_pid() = 0;
     virtual AC_PID& get_rate_yaw_pid() = 0;
 
@@ -296,7 +297,7 @@ public:
     void thrust_heading_rotation_angles(Quaternion& att_to_quat, const Quaternion& att_from_quat, Vector3f& att_diff_angle, float& thrust_vec_dot);
 
     // Calculates the body frame angular velocities to follow the target attitude
-    void attitude_controller_run_quat();
+    void attitude_controller_run_quat();/*四元数姿态控制器*/
 
     // sanity check parameters.  should be called once before take-off
     virtual void parameter_sanity_check() {}
@@ -374,6 +375,7 @@ protected:
     AP_Int8             _angle_boost_enabled;
 
     // angle controller P objects
+    /*角度控制器P对象*/
     AC_P                _p_angle_roll;
     AC_P                _p_angle_pitch;
     AC_P                _p_angle_yaw;
@@ -451,7 +453,7 @@ protected:
     float               _feedforward_scalar = 1.0f;
 
     // References to external libraries
-    const AP_AHRS_View&  _ahrs;
+    const AP_AHRS_View&  _ahrs;/*这个对象的作用就是创建一个获取机体姿态的窗口*/
     const AP_Vehicle::MultiCopter &_aparm;
     AP_Motors&          _motors;
 

@@ -295,60 +295,98 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
 }
 
 // Command an euler roll, pitch and yaw angle with angular velocity feedforward and smoothing
+// 通过roll，pitch和yaw角速度前馈和平滑控制欧拉角
+// 前馈控制器控制量计算在此函数中完成
+// 前三个输入参数：本次输入的期望姿态的roll,pitch,yaw角，可来自遥控器或地面站
 void AC_AttitudeControl::input_euler_angle_roll_pitch_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_angle_cd, bool slew_yaw)
 {
     // Convert from centidegrees on public interface to radians
+    // 角度制转换成弧度制(乘以0.01是因为在输入这个函数之前乘以了100)
     float euler_roll_angle = radians(euler_roll_angle_cd * 0.01f);
     float euler_pitch_angle = radians(euler_pitch_angle_cd * 0.01f);
     float euler_yaw_angle = radians(euler_yaw_angle_cd * 0.01f);
 
     // calculate the attitude target euler angles
+    // _attitude_target_quat表示为当前(未更新本次输入前)的期望姿态的四元数
+    // 可以理解为操作员通过遥控器摇杆输入的期望姿态是实时变更的
+    // 这个总函数(input_euler_xxx)的输入是本次输入的期望，而_attitude_target_quat中保存的是还未收到的本次输入进行更新前
+    // 此次将其转化为欧拉角形式_attitude_target_euler_angle
     _attitude_target_quat.to_euler(_attitude_target_euler_angle.x, _attitude_target_euler_angle.y, _attitude_target_euler_angle.z);
 
     // Add roll trim to compensate tail rotor thrust in heli (will return zero on multirotors)
+    // 添加侧倾调整以补充直升机尾部螺旋桨的推力(在多旋翼飞机上将返回0)
     euler_roll_angle += get_roll_trim_rad();
 
     if (_rate_bf_ff_enabled) {
         // translate the roll pitch and yaw acceleration limits to the euler axis
+        // 如果开启了机体角速率前馈，注意下方将期望角度转换为期望角速率的操作表示的是FF前馈控制器的作用
+        // FF前馈控制器根据期望姿态误差计算出期望姿态的期望角速率，其次是作为前馈控制量叠加到P控制器输出的当前姿态的期望角速率上
+
+        // 将侧倾、俯仰和偏航的加速度限制转换到欧拉轴上
+        // euler_accel_limit()接收当前期望姿态欧拉角和roll,pitch,yaw上的最大加速度
+        // 以此计算出加速度限制，使增加加速度时不会超过任何一个轴的最大加速度
         Vector3f euler_accel = euler_accel_limit(_attitude_target_euler_angle, Vector3f(get_accel_roll_max_radss(), get_accel_pitch_max_radss(), get_accel_yaw_max_radss()));
 
         // When acceleration limiting and feedforward are enabled, the sqrt controller is used to compute an euler
         // angular velocity that will cause the euler angle to smoothly stop at the input angle with limited deceleration
         // and an exponential decay specified by _input_tc at the end.
+        // 根据本次输入的期望姿态和未更新输入的当前期望姿态的姿态角度误差计算期望欧拉角速率校正值_attitude_target_euler_rate
+        // 以roll角为例
+        // wrap_PI(euler_roll_angle - _attitude_target_euler_angle.x):计算本次输入期望roll角和当前期望姿态roll角之间的误差，并将其限制在[-PI,PI]
+        // _input_tc:姿态控制输入时间常数，数字越小，响应越尖锐；数字越大，响应越柔和，默认设定为0.15
+        // euler_accel.x:经限制后的欧拉角加速度
+        // _attitude_target_euler_rate.x：当前期望姿态欧拉角速率
+        // _dt:采样周期
         _attitude_target_euler_rate.x = input_shaping_angle(wrap_PI(euler_roll_angle - _attitude_target_euler_angle.x), _input_tc, euler_accel.x, _attitude_target_euler_rate.x, _dt);
         _attitude_target_euler_rate.y = input_shaping_angle(wrap_PI(euler_pitch_angle - _attitude_target_euler_angle.y), _input_tc, euler_accel.y, _attitude_target_euler_rate.y, _dt);
         _attitude_target_euler_rate.z = input_shaping_angle(wrap_PI(euler_yaw_angle - _attitude_target_euler_angle.z), _input_tc, euler_accel.z, _attitude_target_euler_rate.z, _dt);
-        if (slew_yaw) {
+        if (slew_yaw) {//如果开启了摆率限制，那么还要对期望欧拉角速率进行限制
             _attitude_target_euler_rate.z = constrain_float(_attitude_target_euler_rate.z, -get_slew_yaw_rads(), get_slew_yaw_rads());
         }
 
         // Convert euler angle derivative of desired attitude into a body-frame angular velocity vector for feedforward
+        // 将期望姿态的欧拉角速率_attitude_target_euler_rate转换为前馈的期望机体角速度矢量_attitude_target_ang_vel
+        // 欧拉姿态变化率(n系)转换为期望机体角速度(tb系)：euler_rate_to_ang_vel
         euler_rate_to_ang_vel(_attitude_target_euler_angle, _attitude_target_euler_rate, _attitude_target_ang_vel);
         // Limit the angular velocity
+        // 角速度_attitude_target_ang_vel限幅
         ang_vel_limit(_attitude_target_ang_vel, radians(_ang_vel_roll_max), radians(_ang_vel_pitch_max), radians(_ang_vel_yaw_max));
         // Convert body-frame angular velocity into euler angle derivative of desired attitude
+        // 然后再将限幅后的期望机体角速度(tb系)重新转换为所需姿态的欧拉角速率(n系)
         ang_vel_to_euler_rate(_attitude_target_euler_angle, _attitude_target_ang_vel, _attitude_target_euler_rate);
+        //最后得到的期望角速率_attitude_target_ang_vel和期望欧拉角速率_attitude_target_euler_rate是前馈速率，即前馈控制量
+        //注意以上运算过程是在本次输入的期望姿态与当前期望姿态之间实现的，最后得到的期望角速率是针对于期望机体坐标系的
+        //因此该期望角速率在使用前需要先转换到当前姿态下
+        //_attitude_target_ang_vel:期望姿态下的期望角速率
     } else {
         // When feedforward is not enabled, the target euler angle is input into the target and the feedforward rate is zeroed.
+        // 没有前馈控制时，则将本次目标欧拉角输入保存并将前馈速率归零
         _attitude_target_euler_angle.x = euler_roll_angle;
         _attitude_target_euler_angle.y = euler_pitch_angle;
         if (slew_yaw) {
             // Compute constrained angle error
+            // 如果开启摆率控制，计算出本层次输入期望yaw角和当前期望yaw角之间的误差，并限幅
             float angle_error = constrain_float(wrap_PI(euler_yaw_angle - _attitude_target_euler_angle.z), -get_slew_yaw_rads() * _dt, get_slew_yaw_rads() * _dt);
             // Update attitude target from constrained angle error
+            // 根据误差更新yaw角期望姿态
             _attitude_target_euler_angle.z = wrap_PI(angle_error + _attitude_target_euler_angle.z);
         } else {
-            _attitude_target_euler_angle.z = euler_yaw_angle;
+            _attitude_target_euler_angle.z = euler_yaw_angle;//如果没有开启摆率控制，直接将本次输入保存为当前姿态yaw角
         }
         // Compute quaternion target attitude
+        // 将期望姿态从欧拉角转换为四元数形式(n系下)
+        // 在这里没有开启前馈，则会将本次输入的期望姿态更新到当前期望姿态，然后将前馈速率置0
         _attitude_target_quat.from_euler(_attitude_target_euler_angle.x, _attitude_target_euler_angle.y, _attitude_target_euler_angle.z);
 
         // Set rate feedforward requests to zero
+        // 将速率前馈设置0
         _attitude_target_euler_rate = Vector3f(0.0f, 0.0f, 0.0f);
         _attitude_target_ang_vel = Vector3f(0.0f, 0.0f, 0.0f);
     }
 
     // Call quaternion attitude controller
+    // 调用四元数姿态控制器(真正的P控制器在其中运行)
+    // 根据姿态角误差计算出期望角速率
     attitude_controller_run_quat();
 }
 
@@ -651,32 +689,62 @@ void AC_AttitudeControl::input_angle_step_bf_roll_pitch_yaw(float roll_angle_ste
 }
 
 // Calculates the body frame angular velocities to follow the target attitude
+// 根据姿态误差计算得出期望角速率
 void AC_AttitudeControl::attitude_controller_run_quat()
 {
     // Retrieve quaternion vehicle attitude
+    // 检索四元数车辆姿态
+    // 获取到当前机体姿态的四元数并保存到attitude_vehicle_quat
     Quaternion attitude_vehicle_quat;
     _ahrs.get_quat_body_to_ned(attitude_vehicle_quat);
 
     // Compute attitude error
+    // 计算姿态误差
     Vector3f attitude_error_vector;
+    /*姿态误差的计算和倾转分离，该函数通过前两个输入的四元数参数计算得到各轴的姿态误差
+      经过此函数后得到的参数均在b系下
+      _thrust_error_angle：推力方向(z轴误差角)
+     */
     thrust_heading_rotation_angles(_attitude_target_quat, attitude_vehicle_quat, attitude_error_vector, _thrust_error_angle);
-
+    
     // Compute the angular velocity target from the attitude error
+    // P控制器，输入为姿态误差，输出为期望角速率
+    // 函数内部根据是否开启了sqrt_controller来区分计算各通道的期望角速率_rate_target_ang_vel
+    // 是，则使用开方调整过的P控制器
+    // 否，则使用常规的Kp*error
     _rate_target_ang_vel = update_ang_vel_target_from_att_error(attitude_error_vector);
 
     // Add feedforward term that attempts to ensure that roll and pitch errors rotate with the body frame rather than the reference frame.
     // todo: this should probably be a matrix that couples yaw as well.
+    // 对P控制器输出叠加前馈项，尝试确保侧倾和俯仰误差随车身框架而不是参考框架旋转
+    // x轴的前馈项 = y轴的姿态误差(限幅后的)*陀螺仪获取的z轴角速度
+    // y轴的前馈项 = x轴的姿态误差(限幅后的)*陀螺仪获取的z轴角速度
+    // 注意此处没有对Z轴的期望角速率进行处理
     _rate_target_ang_vel.x += constrain_float(attitude_error_vector.y, -M_PI / 4, M_PI / 4) * _ahrs.get_gyro().z;
     _rate_target_ang_vel.y += -constrain_float(attitude_error_vector.x, -M_PI / 4, M_PI / 4) * _ahrs.get_gyro().z;
 
+    // 期望角速率限幅
     ang_vel_limit(_rate_target_ang_vel, radians(_ang_vel_roll_max), radians(_ang_vel_pitch_max), radians(_ang_vel_yaw_max));
 
     // Add the angular velocity feedforward, rotated into vehicle frame
+    // 角速度前馈旋转到机体坐标中
+    // _attitude_target_ang_vel是一个全局变量，表示期望姿态的期望角速率，是由input_euler_angle_roll_pitch_yaw等类似函数获取到的前馈速率
+    // attitude_target_ang_vel_quat在此处表明是一个向量[0,v]
     Quaternion attitude_target_ang_vel_quat = Quaternion(0.0f, _attitude_target_ang_vel.x, _attitude_target_ang_vel.y, _attitude_target_ang_vel.z);
+    // 运算过程注意四元数和旋转矩阵一样是可以上下标相互约去的，此处以Q(a)(b)形式表明上标为a，下标为b，表示为b向a的旋转过程
+    // attitude_vehicle_quat表示的是cb->n旋转的单位四元数，求逆后表示n->cb
+    // to_to_from_quat = Q(cb)(n)*Q(n)(tb)=Q(cb)(tb)
+    // 表明获取的四元数to_to_from_quat表示tb->cb的旋转，计算公式也可以视作期望姿态与当前姿态作差
     Quaternion to_to_from_quat = attitude_vehicle_quat.inverse() * _attitude_target_quat;
+
+    //将tb下的期望角速率旋转至cb下获取当前姿态角速率期望前馈叠加量desired_ang_vel_quat
     Quaternion desired_ang_vel_quat = to_to_from_quat.inverse() * attitude_target_ang_vel_quat * to_to_from_quat;
 
     // Correct the thrust vector and smoothly add feedforward and yaw input
+    // 校正推力矢量并平稳添加前馈和偏航输入
+    // 下述过程根据推力角误差大小分配在Z轴YAW角上的数学计算结果和传感器测量值之间的确信度来确定Z轴的期望角速度
+    // 同时将前馈控制量添加到各轴
+    // 当推力角误差特别大的时候，表明计算出来的期望值不可信，此时Z轴期望角速度获取陀螺仪测量值
     _feedforward_scalar = 1.0f;
     if (_thrust_error_angle > AC_ATTITUDE_THRUST_ERROR_ANGLE * 2.0f) {
         _rate_target_ang_vel.z = _ahrs.get_gyro().z;
@@ -694,41 +762,72 @@ void AC_AttitudeControl::attitude_controller_run_quat()
 
     if (_rate_bf_ff_enabled) {
         // rotate target and normalize
+        // 当开启机体速率前馈时，实时计算更新期望姿态四元数，每一次更新都需要将其单位化
         Quaternion attitude_target_update_quat;
         attitude_target_update_quat.from_axis_angle(Vector3f(_attitude_target_ang_vel.x * _dt, _attitude_target_ang_vel.y * _dt, _attitude_target_ang_vel.z * _dt));
-        _attitude_target_quat = _attitude_target_quat * attitude_target_update_quat;
+        _attitude_target_quat = _attitude_target_quat * attitude_target_update_quat;//实时更新期望姿态四元数
         _attitude_target_quat.normalize();
     }
 
     // ensure Quaternions stay normalized
+    // 确保四元数已经被单位化
     _attitude_target_quat.normalize();
 
     // Record error to handle EKF resets
+    // 记录姿态误差以处理EKF重置
+    // 等式相当于将_attitude_target_quat表示的期望姿态减去attitude_vehicle_quat表示的当前姿态
     _attitude_ang_error = attitude_vehicle_quat.inverse() * _attitude_target_quat;
 }
 
 // thrust_heading_rotation_angles - calculates two ordered rotations to move the att_from_quat quaternion to the att_to_quat quaternion.
 // The first rotation corrects the thrust vector and the second rotation corrects the heading vector.
+// 官方注释：计算两个有序旋转，以将att_from_quat四元数移动到att_to_quat四元数
+// 第一个旋转校正推力矢量，第二个旋转校正航向矢量
+/* att_to_quat：传入参数，期望姿态四元数，方向：tb->n
+   att_from_quat:传入参数，当前姿态四元数，方向：cb->n，同时也表示从机体b系向n系的旋转
+   att_diff_angle：传入传出参数，姿态误差
+   thrust_vec_dot：传入传出参数，按轴角法进行Z轴对齐时的旋转角*/
 void AC_AttitudeControl::thrust_heading_rotation_angles(Quaternion& att_to_quat, const Quaternion& att_from_quat, Vector3f& att_diff_angle, float& thrust_vec_dot)
 {
+    //获取姿态的期望Z轴和当前Z轴
+
+    //从四元数att_to_quat计算出旋转矩阵att_to_rot_matrix
+    //旋转矩阵att_to_rot_matrix用于将期望姿态机体系旋转到n系
+    //并把期望姿态的Z轴转换到n系下的期望Z轴att_to_thrust_vec
+    //旋转方向：tb->n
     Matrix3f att_to_rot_matrix; // rotation from the target body frame to the inertial frame.
     att_to_quat.rotation_matrix(att_to_rot_matrix);
     Vector3f att_to_thrust_vec = att_to_rot_matrix * Vector3f(0.0f, 0.0f, 1.0f);
 
+    //从四元数att_from_quat计算出旋转矩阵att_from_rot_matrix
+    //旋转矩阵att_from_rot_matrix用于将当前机体坐标系cb转换到n系
+    //并将当前姿态的z轴转换到NED坐标系下的当前Z轴att_from_thrust_vec
+    //旋转方向：cb->n
     Matrix3f att_from_rot_matrix; // rotation from the current body frame to the inertial frame.
     att_from_quat.rotation_matrix(att_from_rot_matrix);
     Vector3f att_from_thrust_vec = att_from_rot_matrix * Vector3f(0.0f, 0.0f, 1.0f);
+
+    //下面通过轴角法和四元数配合，以Z轴误差计算tilt倾角误差
+    //构建轴角(n系下)
+
+
 
     // the dot product is used to calculate the current lean angle for use of external functions
     _thrust_angle = acosf(constrain_float(Vector3f(0.0f,0.0f,1.0f) * att_from_thrust_vec,-1.0f,1.0f));
 
     // the cross product of the desired and target thrust vector defines the rotation vector
+    //叉乘获取旋转向量(转轴)thrust_vec_cross(叉乘后不一定是单位向量)
+    //转轴：thrust_vec_cross，旋转方向：att_from_thrust_vec -> att_to_thrust_vec
     Vector3f thrust_vec_cross = att_from_thrust_vec % att_to_thrust_vec;
 
     // the dot product is used to calculate the angle between the target and desired thrust vectors
+    //点乘获取旋转角thrust_vec_dot
+    //表示向量att_from_thrust_vec转向att_to_thrust_vec的夹角
+    //由于均为单位向量因此直接求arcoss,之后限定为-1~1即可
     thrust_vec_dot = acosf(constrain_float(att_from_thrust_vec * att_to_thrust_vec, -1.0f, 1.0f));
 
     // Normalize the thrust rotation vector
+    // 单位化旋转向量
     float thrust_vector_length = thrust_vec_cross.length();
     if (is_zero(thrust_vector_length) || is_zero(thrust_vec_dot)) {
         thrust_vec_cross = Vector3f(0, 0, 1);
@@ -736,30 +835,56 @@ void AC_AttitudeControl::thrust_heading_rotation_angles(Quaternion& att_to_quat,
     } else {
         thrust_vec_cross /= thrust_vector_length;
     }
+
+    //轴角构造完毕，转轴为单位向量thrust_vec_cross，转角为thrust_vec_dot
+    //旋转方向：n系下的向量att_from_thrust_vec(当前姿态Z轴)->att_to_thrust_vec(期望姿态Z轴)
+
+    //下面将开始将Z轴对准，即通过Z轴误差获取倾角误差(不考虑Yaw转角)
+
+    //轴角转换到四元数
+    //四元数thrust_vec_correction_quat表示n系下以thrust_vec_cross为转轴，thrust_vec_dot为转角的旋转过程
     Quaternion thrust_vec_correction_quat;
     thrust_vec_correction_quat.from_axis_angle(thrust_vec_cross, thrust_vec_dot);
 
     // Rotate thrust_vec_correction_quat to the att_from frame
-    thrust_vec_correction_quat = att_from_quat.inverse() * thrust_vec_correction_quat * att_from_quat;
+    //将倾角误差由n系转向机体坐标系b系
+    //四元数att_from_quat表示的是由机体系b系向n系旋转的过程，n=q×b×inv(q)
+    //b=inv(q)×n×q
+    //此处q为单位四元数，因此其逆等于共轭
+    //注意此处并非标准的四元数旋转描述，因为0不是0标量四元数，详见下方
+    thrust_vec_correction_quat = att_from_quat.inverse() * thrust_vec_correction_quat * att_from_quat;//机体b系下的倾角误差获取完毕
 
     // calculate the remaining rotation required after thrust vector is rotated transformed to the att_from frame
+    // 计算b系下的yaw转角误差
+    // 注意：旋转矩阵B的逆*旋转矩阵A 等价于 旋转A与旋转B作差，由A减去B(但不是减法的意思，只是表明旋转姿态的差异)
+    // 依次左乘：att_from_quat.inverse() * att_to_quat = 期望姿态 - 当前姿态 = 姿态总误差(total error)
+    // thrust_vec_correction_quat.inverse()*total error = 姿态总误差 - 倾角误差(tilt error) = yaw 转角误差(torsion error)
     Quaternion yaw_vec_correction_quat = thrust_vec_correction_quat.inverse() * att_from_quat.inverse() * att_to_quat;
 
     // calculate the angle error in x and y.
+    // 倾角误差四元数转换回轴角
+    // 并通过att_diff_angle获取到roll和pitch上的误差角
     Vector3f rotation;
     thrust_vec_correction_quat.to_axis_angle(rotation);
     att_diff_angle.x = rotation.x;
     att_diff_angle.y = rotation.y;
 
     // calculate the angle error in z (x and y should be zero here).
+    // 转角误差四元数转换回轴角
+    // 通过att_diff_angle.z 获取到yaw上的转角(roll和pitch应该为0)
     yaw_vec_correction_quat.to_axis_angle(rotation);
     att_diff_angle.z = rotation.z;
 
+    // 到此处获得了倾转的所有姿态误差，然而并没有对YAW角误差进行限制
     // Todo: Limit roll an pitch error based on output saturation and maximum error.
 
     // Limit Yaw Error based on maximum acceleration - Update to include output saturation and maximum error.
     // Currently the limit is based on the maximum acceleration using the linear part of the SQRT controller.
     // This should be updated to be based on an angle limit, saturation, or unlimited based on user defined parameters.
+    // 基于最大加速度限制偏航误差-更新以包括输出饱和度和最大误差
+    // 当前，该限制基于使用SQRT控制器的线性部分的最大加速度
+    // 应该将其更新为基于角度限制，饱和度或基于用户定义的参数
+    // 注：这里不明白
     if (!is_zero(_p_angle_yaw.kP()) && fabsf(att_diff_angle.z) > AC_ATTITUDE_ACCEL_Y_CONTROLLER_MAX_RADSS / _p_angle_yaw.kP()) {
         att_diff_angle.z = constrain_float(wrap_PI(att_diff_angle.z), -AC_ATTITUDE_ACCEL_Y_CONTROLLER_MAX_RADSS / _p_angle_yaw.kP(), AC_ATTITUDE_ACCEL_Y_CONTROLLER_MAX_RADSS / _p_angle_yaw.kP());
         yaw_vec_correction_quat.from_axis_angle(Vector3f(0.0f, 0.0f, att_diff_angle.z));
@@ -772,13 +897,17 @@ void AC_AttitudeControl::thrust_heading_rotation_angles(Quaternion& att_to_quat,
 float AC_AttitudeControl::input_shaping_angle(float error_angle, float input_tc, float accel_max, float target_ang_vel, float dt)
 {
     // Calculate the velocity as error approaches zero with acceleration limited by accel_max_radss
+    // sqrt_controller作为调整后的P控制器，根据接收到的角度误差计算出期望角速率
+    // Kp=1.0f / MAX(input_tc, 0.01f)
     float desired_ang_vel = sqrt_controller(error_angle, 1.0f / MAX(input_tc, 0.01f), accel_max, dt);
 
     // Acceleration is limited directly to smooth the beginning of the curve.
+    // 直接限制加速度以平滑曲线的起点
     return input_shaping_ang_vel(target_ang_vel, desired_ang_vel, accel_max, dt);
 }
 
 // limits the acceleration and deceleration of a velocity request
+// 限制速度请求的加速和减速  
 float AC_AttitudeControl::input_shaping_ang_vel(float target_ang_vel, float desired_ang_vel, float accel_max, float dt)
 {
     // Acceleration is limited directly to smooth the beginning of the curve.
@@ -877,6 +1006,10 @@ void AC_AttitudeControl::inertial_frame_reset()
 }
 
 // Convert a 321-intrinsic euler angle derivative to an angular velocity vector
+// euler_rad：为当前时刻的欧拉角，euler_rate_rads：为n系上的姿态欧拉角速率，ang_vel_rads：为b系上的角速度
+/*说明：前面计算出来的前馈速率euler_rate_rads是基于期望姿态的，也就是根据本次输入期望姿态和当下期望姿态计算的，在使用前，要将其转化到当前姿态坐标系下
+ *而attitude_controller_run_quat中的P控制器则是通过当下期望姿态_attitude_target_quat与当前姿态的误差计算得到期望角速度的
+*/
 void AC_AttitudeControl::euler_rate_to_ang_vel(const Vector3f& euler_rad, const Vector3f& euler_rate_rads, Vector3f& ang_vel_rads)
 {
     float sin_theta = sinf(euler_rad.y);
@@ -910,11 +1043,12 @@ bool AC_AttitudeControl::ang_vel_to_euler_rate(const Vector3f& euler_rad, const 
 }
 
 // Update rate_target_ang_vel using attitude_error_rot_vec_rad
+// 使用姿态误差来更新角速率
 Vector3f AC_AttitudeControl::update_ang_vel_target_from_att_error(const Vector3f &attitude_error_rot_vec_rad)
 {
     Vector3f rate_target_ang_vel;
     // Compute the roll angular velocity demand from the roll angle error
-    if (_use_sqrt_controller) {
+    if (_use_sqrt_controller) {//如果使用了开方控制器
         rate_target_ang_vel.x = sqrt_controller(attitude_error_rot_vec_rad.x, _p_angle_roll.kP(), constrain_float(get_accel_roll_max_radss() / 2.0f, AC_ATTITUDE_ACCEL_RP_CONTROLLER_MIN_RADSS, AC_ATTITUDE_ACCEL_RP_CONTROLLER_MAX_RADSS), _dt);
     } else {
         rate_target_ang_vel.x = _p_angle_roll.kP() * attitude_error_rot_vec_rad.x;
@@ -968,25 +1102,32 @@ float AC_AttitudeControl::get_althold_lean_angle_max() const
 }
 
 // Proportional controller with piecewise sqrt sections to constrain second derivative
+/*用分段根号段约束二阶导数的比例控制器 
+ *输入参数error         :误差量
+ *输入参数p             :Kp值
+ *输入参数second_ord_lim:二阶限制，acc_max
+ *输入参数dt            ：时间
+ *注：P开方控制器
+*/
 float AC_AttitudeControl::sqrt_controller(float error, float p, float second_ord_lim, float dt)
 {
     float correction_rate;
     if (is_negative(second_ord_lim) || is_zero(second_ord_lim)) {
         // second order limit is zero or negative.
-        correction_rate = error * p;
+        correction_rate = error * p;/*二阶限制(加速度)是否为负或者为0，是的话开方控制器不起作用，常规方法算*/
     } else if (is_zero(p)) {
-        // P term is zero but we have a second order limit.
-        if (is_positive(error)) {
+        // P term is zero but we have a second order limit./*Kp = 0,采用如下方法算二阶限制*/
+        if (is_positive(error)) {/*如果误差为正*/
             correction_rate = safe_sqrt(2.0f * second_ord_lim * (error));
-        } else if (is_negative(error)) {
+        } else if (is_negative(error)) {/*如果误差为负*/
             correction_rate = -safe_sqrt(2.0f * second_ord_lim * (-error));
-        } else {
+        } else {/*如果误差为0*/
             correction_rate = 0.0f;
         }
     } else {
-        // Both the P and second order limit have been defined.
-        float linear_dist = second_ord_lim / sq(p);
-        if (error > linear_dist) {
+        // Both the P and second order limit have been defined./*同时定义了Kp和二阶限制*/
+        float linear_dist = second_ord_lim / sq(p);/*分界点的计算*/
+        if (error > linear_dist) {/*根据误差error与分界点的关系采用不同的公式*/
             correction_rate = safe_sqrt(2.0f * second_ord_lim * (error - (linear_dist / 2.0f)));
         } else if (error < -linear_dist) {
             correction_rate = -safe_sqrt(2.0f * second_ord_lim * (-error - (linear_dist / 2.0f)));
@@ -996,7 +1137,8 @@ float AC_AttitudeControl::sqrt_controller(float error, float p, float second_ord
     }
     if (!is_zero(dt)) {
         // this ensures we do not get small oscillations by over shooting the error correction in the last time step.
-        return constrain_float(correction_rate, -fabsf(error) / dt, fabsf(error) / dt);
+        /*这确保了我们不会因为在最后一个时间步骤中超过了错误校正而得到小的振荡*/
+        return constrain_float(correction_rate, -fabsf(error) / dt, fabsf(error) / dt);/*对速度进行限幅*/
     } else {
         return correction_rate;
     }

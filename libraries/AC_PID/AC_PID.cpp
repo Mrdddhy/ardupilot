@@ -117,39 +117,39 @@ float AC_PID::update_all(float target, float measurement, bool limit)
 {
     // don't process inf or NaN
     if (!isfinite(target) || !isfinite(measurement)) {
-        return 0.0f;
+        return 0.0f;/*注：isfinite()可以用来判断一个数同时是不是有限的或者是正常的，是的返回true*/
     }
 
     // reset input filter to value received
-    if (_flags._reset_filter) {
-        _flags._reset_filter = false;
-        _target = target;
+    if (_flags._reset_filter) {/*根据是否重启滤波器采用不同的计算方法*/
+        _flags._reset_filter = false;/*如果reset标志位智1，首先将reset位置0*/
+        _target = target;/*期望和误差按照正常方式计算，但不进行滤波*/
         _error = _target - measurement;
-        _derivative = 0.0f;
+        _derivative = 0.0f;/*本次微分项为0*/
     } else {
-        float error_last = _error;
-        _target += get_filt_T_alpha() * (target - _target);
-        _error += get_filt_E_alpha() * ((_target - measurement) - _error);
+        float error_last = _error;/*如果不需要重置滤波器，首先保存上一次计算的误差量*/
+        _target += get_filt_T_alpha() * (target - _target);/*计算本次输入期望与上一次期望之间的偏差，经过T滤波器滤波之后叠加到上一次保存的期望*/
+        _error += get_filt_E_alpha() * ((_target - measurement) - _error);/*计算本次期望与测量值之间的误差，并与上一次保存的误差作差，经过E滤波器之后叠加*/
 
         // calculate and filter derivative
         if (_dt > 0.0f) {
             float derivative = (_error - error_last) / _dt;
-            _derivative += get_filt_D_alpha() * (derivative - _derivative);
+            _derivative += get_filt_D_alpha() * (derivative - _derivative);/*计算并且滤波微分项，操作与上面相同*/
         }
     }
 
     // update I term
-    update_i(limit);
+    update_i(limit);/*根据limit是否为true选择是否仅允许积分量向变小的方向运算，更新I项*/
 
-    float P_out = (_error * _kp);
-    float D_out = (_derivative * _kd);
-
+    float P_out = (_error * _kp);/*计算P项*/
+    float D_out = (_derivative * _kd);/*计算D项*/
+    /*参数保存到日志的PID信息中*/
     _pid_info.target = _target;
     _pid_info.actual = measurement;
     _pid_info.error = _error;
     _pid_info.P = P_out;
     _pid_info.D = D_out;
-
+    /*返回PID运算量*/
     return P_out + _integrator + D_out;
 }
 
@@ -199,20 +199,22 @@ float AC_PID::update_error(float error, bool limit)
     return P_out + _integrator + D_out;
 }
 
-//  update_i - update the integral
+//  update_i - update the integral：积分量更新
 //  If the limit flag is set the integral is only allowed to shrink
 void AC_PID::update_i(bool limit)
 {
     if (!is_zero(_ki) && is_positive(_dt)) {
         // Ensure that integrator can only be reduced if the output is saturated
+        /*如果limit=1则仅允许积分量朝变小的方向运算，根据积分量和误差的正负确定进入if还是else*/
+        /*如果limit=0则表明运行积分量运算上下波动，只能进入if语句不断进行积分量累加*/
         if (!limit || ((is_positive(_integrator) && is_negative(_error)) || (is_negative(_integrator) && is_positive(_error)))) {
             _integrator += ((float)_error * _ki) * _dt;
-            _integrator = constrain_float(_integrator, -_kimax, _kimax);
+            _integrator = constrain_float(_integrator, -_kimax, _kimax);/*积分限幅*/
         }
-    } else {
+    } else {/*如果积分量和误差方向相同，为了防止PID的输出由此不断累积扩大，本次积分作用取消*/
         _integrator = 0.0f;
     }
-    _pid_info.I = _integrator;
+    _pid_info.I = _integrator;/*保存到日志*/
 }
 
 float AC_PID::get_p() const
@@ -232,8 +234,8 @@ float AC_PID::get_d() const
 
 float AC_PID::get_ff()
 {
-    _pid_info.FF = _target * _kff;
-    return _target * _kff;
+    _pid_info.FF = _target * _kff;/*计算前馈控制量并保存到日志参数表中*/
+    return _target * _kff;/*返回前馈量*/
 }
 
 // todo: remove function when it is no longer used.

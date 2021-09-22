@@ -237,7 +237,8 @@ const AP_Param::GroupInfo AC_AttitudeControl_Multi::var_info[] = {
 
     AP_GROUPEND
 };
-
+//1、构造函数实现和AC_AttitudeControl一样接受了四个相同的参数，同时使用列表初始化将这四个参数赋值给AC_AttitudeControl类完成类初始化
+//2、并且对RPY的3个PID控制器的参数进行赋值
 AC_AttitudeControl_Multi::AC_AttitudeControl_Multi(AP_AHRS_View &ahrs, const AP_Vehicle::MultiCopter &aparm, AP_MotorsMulticopter& motors, float dt) :
     AC_AttitudeControl(ahrs, aparm, motors, dt),
     _motors_multi(motors),
@@ -331,14 +332,17 @@ void AC_AttitudeControl_Multi::update_throttle_rpy_mix()
 void AC_AttitudeControl_Multi::rate_controller_run()
 {
     // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
-    update_throttle_rpy_mix();
+    update_throttle_rpy_mix();/*将油门与姿态混合移至所需位置*/
 
     _rate_target_ang_vel += _rate_sysid_ang_vel;
 
-    Vector3f gyro_latest = _ahrs.get_gyro_latest();
-
+    Vector3f gyro_latest = _ahrs.get_gyro_latest();/*获取到最新的陀螺仪角速度参数*/
+    /*get_rate_roll_pid()返回该通道上的pid控制器，返回一个AC_PID类对象
+      update_all()真正的PID控制器，根据输入的期望角速率和当前的角速率进行PID运算
+      运算得到电机控制指令并通过set_xxx()函数赋值给这个通道上的电机
+    */
     _motors.set_roll(get_rate_roll_pid().update_all(_rate_target_ang_vel.x, gyro_latest.x, _motors.limit.roll) + _actuator_sysid.x);
-    _motors.set_roll_ff(get_rate_roll_pid().get_ff());
+    _motors.set_roll_ff(get_rate_roll_pid().get_ff());/*根据期望角速率计算前馈量*/
 
     _motors.set_pitch(get_rate_pitch_pid().update_all(_rate_target_ang_vel.y, gyro_latest.y, _motors.limit.pitch) + _actuator_sysid.y);
     _motors.set_pitch_ff(get_rate_pitch_pid().get_ff());

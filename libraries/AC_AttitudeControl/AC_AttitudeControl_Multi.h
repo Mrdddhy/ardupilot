@@ -41,13 +41,14 @@
 
 class AC_AttitudeControl_Multi : public AC_AttitudeControl {
 public:
-	AC_AttitudeControl_Multi(AP_AHRS_View &ahrs, const AP_Vehicle::MultiCopter &aparm, AP_MotorsMulticopter& motors, float dt);
+	AC_AttitudeControl_Multi(AP_AHRS_View &ahrs, const AP_Vehicle::MultiCopter &aparm, AP_MotorsMulticopter& motors, float dt);//声明构造函数
 
 	// empty destructor to suppress compiler warning
 	virtual ~AC_AttitudeControl_Multi() {}
 
     // pid accessors
-    AC_PID& get_rate_roll_pid() override { return _pid_rate_roll; }
+    /*角速度(欧拉角姿态变化速率)PID控制器对象的实现和参数获取是在派生类具体实现的*/
+    AC_PID& get_rate_roll_pid() override { return _pid_rate_roll; }/*对虚函数进行了具体的实现*/
     AC_PID& get_rate_pitch_pid() override { return _pid_rate_pitch; }
     AC_PID& get_rate_yaw_pid() override { return _pid_rate_yaw; }
 
@@ -90,7 +91,7 @@ protected:
     float get_throttle_avg_max(float throttle_in);
 
     AP_MotorsMulticopter& _motors_multi;
-    AC_PID                _pid_rate_roll;
+    AC_PID                _pid_rate_roll;/*角速度PID控制对象*/
     AC_PID                _pid_rate_pitch;
     AC_PID                _pid_rate_yaw;
 

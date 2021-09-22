@@ -20,7 +20,10 @@
 
 #include "AP_AHRS_View.h"
 #include <stdio.h>
-
+/*函数功能：AP_AHRS_View()构造函数
+  第一个参数：监视的传感器
+  第二个参数：传感器旋转的角度
+  第三个参数：俯仰角的修整度*/
 AP_AHRS_View::AP_AHRS_View(AP_AHRS &_ahrs, enum Rotation _rotation, float pitch_trim_deg) :
     rotation(_rotation),
     ahrs(_ahrs)
@@ -84,9 +87,9 @@ void AP_AHRS_View::update(bool skip_ins_update)
 
 // return a smoothed and corrected gyro vector using the latest ins data (which may not have been consumed by the EKF yet)
 Vector3f AP_AHRS_View::get_gyro_latest(void) const {
-    Vector3f gyro_latest = ahrs.get_gyro_latest();
-    gyro_latest.rotate(rotation);
-    return gyro_latest;
+    Vector3f gyro_latest = ahrs.get_gyro_latest();/*内部调用了AP_AHRS对象ahrs的方法，获取陀螺仪数据*/
+    gyro_latest.rotate(rotation);/*陀螺仪数据进行角度旋转*/
+    return gyro_latest;/*返回处理后的陀螺仪数据*/
 }
 
 // rotate a 2D vector from earth frame to body frame
