@@ -1262,6 +1262,8 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
  *  callback in long running library initialisation routines to allow
  *  MAVLink to process packets while waiting for the initialisation to
  *  complete
+ * 处理MAVLink数据包的delay()回调。我们长时间运行的库初始化例程中将其设置为回调，以允许
+ * MAVLink在等待初始化完成的同时处理数据包
  */
 void Copter::mavlink_delay_cb()
 {

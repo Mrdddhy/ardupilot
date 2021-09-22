@@ -198,7 +198,7 @@ public:
     friend class AP_Rally_Copter;
     friend class Parameters;
     friend class ParametersG2;
-    friend class AP_Avoidance_Copter;
+    friend class AP_Avoidance_Copter;//友元类，这些类中的成员函数能够访问Copter类中的私有成员
 
 #if ADVANCED_FAILSAFE == ENABLED
     friend class AP_AdvancedFailsafe_Copter;
@@ -406,6 +406,8 @@ private:
     float arming_altitude_m;
 
     // Failsafe
+    // 失效保护
+    // 包括两部分：最新一次故障时间的记录以及故障标志位更新
     struct {
         uint32_t last_heartbeat_ms;      // the time when the last HEARTBEAT message arrived from a GCS - used for triggering gcs failsafe
         uint32_t terrain_first_failure_ms;  // the first time terrain data access failed - used to calculate the duration of the failure
@@ -425,6 +427,7 @@ private:
     }
 
     // sensor health for logging
+    // 传感器健康状态监测
     struct {
         uint8_t baro        : 1;    // true if baro is healthy
         uint8_t compass     : 1;    // true if compass is healthy
@@ -432,6 +435,7 @@ private:
     } sensor_health;
 
     // Motor Output
+    // 电机库的定义
     MOTOR_CLASS *motors;
     const struct AP_Param::GroupInfo *motors_var_info;
 

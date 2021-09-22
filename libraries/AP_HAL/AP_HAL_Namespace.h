@@ -6,9 +6,11 @@
 namespace AP_HAL {
 
     /* Toplevel pure virtual class Hal.*/
-    class HAL;
+    class HAL;//这个硬件层抽象类是定义在命名空间AP_HAL内的
 
     /* Toplevel class names for drivers: */
+    //驱动程序的顶级类名的声明
+    //它们的实现要具体跳转到对应的实现里看
     class UARTDriver;
     class I2CDevice;
     class I2CDeviceManager;

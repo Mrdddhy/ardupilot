@@ -503,6 +503,8 @@ const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum
 // find_serial - searches available serial ports for the first instance that allows the given protocol
 //  instance should be zero if searching for the first instance, 1 for the second, etc
 //  returns uart on success, nullptr if a serial port cannot be found
+//  在可用的串行端口搜索允许给定协议的第一个实例(instance),如果搜索的是协议的第一个实例，那么实例(instance)应该为0
+//  成功则返回串口设备
 AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, uint8_t instance) const
 {
     const struct UARTState *_state = find_protocol_instance(protocol, instance);

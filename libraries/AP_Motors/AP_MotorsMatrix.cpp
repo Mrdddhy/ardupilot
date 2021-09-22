@@ -484,6 +484,7 @@ void AP_MotorsMatrix::remove_motor(int8_t motor_num)
     }
 }
 
+//ArduCopter 推力分配
 void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_type frame_type)
 {
     // remove existing motors

@@ -38,7 +38,7 @@
 class AP_Vehicle : public AP_HAL::HAL::Callbacks {
 
 public:
-
+    // 构造方法确保单例
     AP_Vehicle() {
         if (_singleton) {
             AP_HAL::panic("Too many Vehicles");
@@ -47,6 +47,7 @@ public:
     }
 
     /* Do not allow copies */
+    //禁止拷贝构造方法防止递归引用
     AP_Vehicle(const AP_Vehicle &other) = delete;
     AP_Vehicle &operator=(const AP_Vehicle&) = delete;
 
@@ -56,6 +57,7 @@ public:
 
     /*
       common parameters for fixed wing aircraft
+      固定翼飞行的通用参数
      */
     struct FixedWing {
         AP_Int8 throttle_min;
@@ -87,10 +89,11 @@ public:
             uint8_t in_range_count;
             float height_estimate;
             float last_distance;
-        };
+        };//测距仪状态
 
 
         // stages of flight
+        // 飞行状态
         enum FlightStage {
             FLIGHT_TAKEOFF       = 1,
             FLIGHT_VTOL          = 2,
@@ -102,9 +105,10 @@ public:
 
     /*
       common parameters for multicopters
+      多旋翼通用参数
      */
     struct MultiCopter {
-        AP_Int16 angle_max;
+        AP_Int16 angle_max;//最大角度
     };
 
 protected:

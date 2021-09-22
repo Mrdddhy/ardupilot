@@ -20,7 +20,7 @@
 #define MAVLINK_COMM_NUM_BUFFERS 6
 #else
 // allow five telemetry ports
-#define MAVLINK_COMM_NUM_BUFFERS 5
+#define MAVLINK_COMM_NUM_BUFFERS 5 //最多只能有5个接口
 #endif
 
 /*

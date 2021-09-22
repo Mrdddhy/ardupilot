@@ -886,7 +886,7 @@ protected:
 
     GCS_MAVLINK_Parameters chan_parameters[MAVLINK_COMM_NUM_BUFFERS];
     uint8_t _num_gcs;
-    GCS_MAVLINK *_chan[MAVLINK_COMM_NUM_BUFFERS];
+    GCS_MAVLINK *_chan[MAVLINK_COMM_NUM_BUFFERS];//GCS_MAVLINK类生成的指针数组对象
 
 private:
 

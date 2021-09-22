@@ -608,6 +608,7 @@ void Copter::publish_osd_info()
 
 /*
   constructor for main Copter class
+  实现对Copter类的构造
  */
 Copter::Copter(void)
     : logger(g.log_bitmask),
@@ -622,8 +623,8 @@ Copter::Copter(void)
     flightmode(&mode_stabilize)
 {
     // init sensor error logging flags
-    sensor_health.baro = true;
-    sensor_health.compass = true;
+    sensor_health.baro = true;//设置气压计传感器状态
+    sensor_health.compass = true;//设置罗盘状态
 }
 
 Copter copter;

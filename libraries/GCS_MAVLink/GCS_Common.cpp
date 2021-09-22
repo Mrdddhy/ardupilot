@@ -1920,13 +1920,13 @@ void GCS::setup_console()
 {
     AP_HAL::UARTDriver *uart = AP::serialmanager().find_serial(AP_SerialManager::SerialProtocol_MAVLink, 0);
     if (uart == nullptr) {
-        // this is probably not going to end well.
+        // this is probably not going to end well.//串口设备检测判断，没有直接返回
         return;
     }
-    if (ARRAY_SIZE(chan_parameters) == 0) {
+    if (ARRAY_SIZE(chan_parameters) == 0) {//chan参数判断，没有则直接返回
         return;
     }
-    create_gcs_mavlink_backend(chan_parameters[0], *uart);
+    create_gcs_mavlink_backend(chan_parameters[0], *uart);//根据给定的chan_parameters[]中的参数以及获取到的串口生成新的GCS_MAVLINK_XXX对象
 }
 
 
@@ -1945,7 +1945,7 @@ void GCS::create_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params, AP_HAL::UAR
         return;
     }
 
-    if (!_chan[_num_gcs]->init(_num_gcs)) {
+    if (!_chan[_num_gcs]->init(_num_gcs)) {//如果初始化失败，就删除这个接口
         delete _chan[_num_gcs];
         _chan[_num_gcs] = nullptr;
         return;

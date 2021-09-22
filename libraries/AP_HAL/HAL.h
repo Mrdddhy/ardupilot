@@ -17,10 +17,10 @@ class AP_Param;
 #include "CAN.h"
 #endif
 
-
+//在HAL这个类里面由各种最基础的底层外设抽象组合而成，即构成了一个HAL抽象基类组件的集合
 class AP_HAL::HAL {
 public:
-    HAL(AP_HAL::UARTDriver* _uartA, // console
+    HAL(AP_HAL::UARTDriver* _uartA, // console   //各基本外设抽象基类
         AP_HAL::UARTDriver* _uartB, // 1st GPS
         AP_HAL::UARTDriver* _uartC, // telem1
         AP_HAL::UARTDriver* _uartD, // telem2
@@ -46,7 +46,7 @@ public:
         AP_HAL::CANManager** _can_mgr)
 #endif
         :
-        uartA(_uartA),
+        uartA(_uartA),                      //初始化列表，基类指向子类
         uartB(_uartB),
         uartC(_uartC),
         uartD(_uartD),
@@ -80,12 +80,12 @@ public:
         AP_HAL::init();
     }
 
-    struct Callbacks {
+    struct Callbacks {                  //  基础抽象类组件，内部纯虚函数等待子类重写
         virtual void setup() = 0;
         virtual void loop() = 0;
     };
 
-    struct FunCallbacks : public Callbacks {
+    struct FunCallbacks : public Callbacks {    //派生自Callbacks
         FunCallbacks(void (*setup_fun)(void), void (*loop_fun)(void));
 
         void setup() override { _setup(); }
@@ -96,9 +96,9 @@ public:
         void (*_loop)(void);
     };
 
-    virtual void run(int argc, char * const argv[], Callbacks* callbacks) const = 0;
+    virtual void run(int argc, char * const argv[], Callbacks* callbacks) const = 0;//run接口方法
 
-    AP_HAL::UARTDriver* uartA;
+    AP_HAL::UARTDriver* uartA;                //抽象类基础成员组件
     AP_HAL::UARTDriver* uartB;
     AP_HAL::UARTDriver* uartC;
     AP_HAL::UARTDriver* uartD;

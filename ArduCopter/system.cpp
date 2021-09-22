@@ -48,6 +48,8 @@ void Copter::init_ardupilot()
 #endif
 
     // identify ourselves correctly with the ground station
+    // g为Parameters对象，在Parameters.cpp中实现了sysid_this_mav的默认赋值
+    // sysid_this_mav -> MAV_SYSTEM_ID = 1
     mavlink_system.sysid = g.sysid_this_mav;/*辨识我们与地面站正确连接*/
     
     // initialise serial ports

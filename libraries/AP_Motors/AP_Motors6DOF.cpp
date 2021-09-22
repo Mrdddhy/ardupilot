@@ -121,6 +121,7 @@ const AP_Param::GroupInfo AP_Motors6DOF::var_info[] = {
     AP_GROUPEND
 };
 
+//ROV推力分配
 void AP_Motors6DOF::setup_motors(motor_frame_class frame_class, motor_frame_type frame_type)
 {
     // remove existing motors
@@ -223,7 +224,7 @@ void AP_Motors6DOF::output_min()
         }
     }
 }
-
+/*该函数的作用是将-1~1的thrust_in输入转换为pwm输出，由于增加了安全限制，PWM控制范围为1100到1900*/
 int16_t AP_Motors6DOF::calc_thrust_to_pwm(float thrust_in) const
 {
     return constrain_int16(1500 + thrust_in * 400, _throttle_radio_min, _throttle_radio_max);
