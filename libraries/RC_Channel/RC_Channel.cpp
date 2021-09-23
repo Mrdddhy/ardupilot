@@ -131,16 +131,16 @@ bool RC_Channel::update(void)
     if (has_override() && !rc().ignore_overrides()) {
         radio_in = override_value;
     } else if (!rc().ignore_receiver()) {
-        radio_in = hal.rcin->read(ch_in);
+        radio_in = hal.rcin->read(ch_in);//读取遥控器通道的输入
     } else {
         return false;
     }
 
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
-        control_in = pwm_to_range();
+        control_in = pwm_to_range();//将脉宽调制值转换为配置范围内的值
     } else {
         //RC_CHANNEL_TYPE_ANGLE
-        control_in = pwm_to_angle();
+        control_in = pwm_to_angle();//从当前遥控器输入值返回一个角度
     }
 
     return true;

@@ -25,22 +25,22 @@ void Copter::init_rc_in()
     channel_throttle = rc().channel(rcmap.throttle()-1);
     channel_yaw      = rc().channel(rcmap.yaw()-1);
 
-    // set rc channel ranges
-    channel_roll->set_angle(ROLL_PITCH_YAW_INPUT_MAX);
-    channel_pitch->set_angle(ROLL_PITCH_YAW_INPUT_MAX);
-    channel_yaw->set_angle(ROLL_PITCH_YAW_INPUT_MAX);
-    channel_throttle->set_range(1000);
+    //设置遥控器量程--- set rc channel ranges
+    channel_roll->set_angle(ROLL_PITCH_YAW_INPUT_MAX);//横滚通道[-4500,4500]
+    channel_pitch->set_angle(ROLL_PITCH_YAW_INPUT_MAX);//俯仰通道[-4500,4500]
+    channel_yaw->set_angle(ROLL_PITCH_YAW_INPUT_MAX);//偏航通道[-4500,4500]
+    channel_throttle->set_range(1000);//油门通道[0-1000]
 
-    // set auxiliary servo ranges
+    // 其他辅助通道设置---set auxiliary servo ranges
     rc().channel(CH_5)->set_range(1000);
     rc().channel(CH_6)->set_range(1000);
     rc().channel(CH_7)->set_range(1000);
     rc().channel(CH_8)->set_range(1000);
 
-    // set default dead zones
+    // 死区默认设置--- set default dead zones
     default_dead_zones();
 
-    // initialise throttle_zero flag
+    //初始化油门为零标志--- initialise throttle_zero flag
     ap.throttle_zero = true;
 }
 

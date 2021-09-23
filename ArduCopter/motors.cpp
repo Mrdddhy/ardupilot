@@ -136,6 +136,7 @@ void Copter::motors_output()
     // this is to allow the failsafe module to deliberately crash
     // the vehicle. Only used in extreme circumstances to meet the
     // OBC rules
+    // 这是为了允许故障安全模块故意崩溃。车辆，只有在极端情况下才能满足OBC规则
     if (g2.afs.should_crash_vehicle()) {
         g2.afs.terminate_vehicle();
         if (!g2.afs.terminating_vehicle_via_landing()) {
@@ -146,20 +147,25 @@ void Copter::motors_output()
 #endif
 
     // Update arming delay state
+    // 解锁延迟，也就是机器解锁后不立即启动，延迟2s
     if (ap.in_arming_delay && (!motors->armed() || millis()-arm_time_ms > ARMING_DELAY_SEC*1.0e3f || control_mode == Mode::Number::THROW)) {
         ap.in_arming_delay = false;
     }
 
     // output any servo channels
+    // 输出所有的伺服通道
     SRV_Channels::calc_pwm();
 
     // cork now, so that all channel outputs happen at once
+    // 立即触发，所有通道输出
     SRV_Channels::cork();
 
     // update output on any aux channels, for manual passthru
+    // 更新辅助通道输出，手动通行
     SRV_Channels::output_ch_all();
 
     // check if we are performing the motor test
+    // 检查我们是否执行电机测试
     if (ap.motor_test) {
         motor_test_output();
     } else {
@@ -173,10 +179,12 @@ void Copter::motors_output()
         }
 
         // send output signals to motors
+        // 向电机发送输出信号
         motors->output();
     }
 
     // push all channels
+    // 发送到所有通道
     SRV_Channels::push();
 }
 

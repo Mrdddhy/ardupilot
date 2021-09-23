@@ -113,7 +113,7 @@ void Copter::init_ardupilot()
     input_manager.set_loop_rate(scheduler.get_loop_rate_hz());
 #endif
 
-   /*遥控器通道初始化*/
+   /*设置遥控器通道初始化*/
     init_rc_in();               // sets up rc channels from radio
 
     // allocate the motors class
@@ -121,11 +121,11 @@ void Copter::init_ardupilot()
     allocate_motors();
 
     // initialise rc channels including setting mode
-    /*接收机初始化？*/
+    /*遥控器初始化？*/
     rc().init();
 
     // sets up motors and output to escs
-    /*初始化接收机输出？*/
+    /*初始化电机和电调输出？*/
     init_rc_out();
 
     // check if we should enter esc calibration mode

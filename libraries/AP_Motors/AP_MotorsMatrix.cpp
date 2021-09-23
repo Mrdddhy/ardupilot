@@ -145,18 +145,19 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     float   yaw_allowed = 1.0f;         // amount of yaw we can fit in
     float   thr_adj;                    // the difference between the pilot's desired throttle and throttle_thrust_best_rpy
 
-    // apply voltage and air pressure compensation
+    // 申请电压和气压补偿---apply voltage and air pressure compensation
     const float compensation_gain = get_compensation_gain(); // compensation for battery voltage and altitude
-    roll_thrust = (_roll_in + _roll_in_ff) * compensation_gain;
-    pitch_thrust = (_pitch_in + _pitch_in_ff) * compensation_gain;
-    yaw_thrust = (_yaw_in + _yaw_in_ff) * compensation_gain;
-    throttle_thrust = get_throttle() * compensation_gain;
-    throttle_avg_max = _throttle_avg_max * compensation_gain;
+    roll_thrust = (_roll_in + _roll_in_ff) * compensation_gain;//横滚推力计算
+    pitch_thrust = (_pitch_in + _pitch_in_ff) * compensation_gain;//俯仰推力计算
+    yaw_thrust = (_yaw_in + _yaw_in_ff) * compensation_gain;//偏航推力计算
+    throttle_thrust = get_throttle() * compensation_gain;//垂直升力计算
+    throttle_avg_max = _throttle_avg_max * compensation_gain;//
 
     // If thrust boost is active then do not limit maximum thrust
     throttle_thrust_max = _thrust_boost_ratio + (1.0f - _thrust_boost_ratio) * _throttle_thrust_max * compensation_gain;
 
     // sanity check throttle is above zero and below current limited throttle
+    // 检查油门值是0或者比限制的值低
     if (throttle_thrust <= 0.0f) {
         throttle_thrust = 0.0f;
         limit.throttle_lower = true;
@@ -261,7 +262,7 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     float rpy_high = -1.0f; // highest thrust value
     for (i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i]) {
-            _thrust_rpyt_out[i] = _thrust_rpyt_out[i] + yaw_thrust * _yaw_factor[i];
+            _thrust_rpyt_out[i] = _thrust_rpyt_out[i] + yaw_thrust * _yaw_factor[i];//最终输出到每个电机的值
 
             // record lowest roll + pitch + yaw command
             if (_thrust_rpyt_out[i] < rpy_low) {

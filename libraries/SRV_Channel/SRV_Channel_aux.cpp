@@ -61,7 +61,7 @@ void SRV_Channel::output_ch(void)
         }
     }
     if (!(SRV_Channels::disabled_mask & (1U<<ch_num))) {
-        hal.rcout->write(ch_num, output_pwm);
+        hal.rcout->write(ch_num, output_pwm);//最后调用硬件抽象层hal.rcout->write()
     }
 }
 

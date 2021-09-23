@@ -516,31 +516,38 @@ void Copter::init_simple_bearing()
 }
 
 // update_simple_mode - rotates pilot input if we are in simple mode
+// 更新遥控器控制机头飞行模式
 void Copter::update_simple_mode(void)
 {
     float rollx, pitchx;
 
     // exit immediately if no new radio frame or not in simple mode
-    if (ap.simple_mode == 0 || !ap.new_radio_frame) {
+    // 如果没有新遥控器数据，或在简单模式下，则立即退出
+    if (ap.simple_mode == 0 || !ap.new_radio_frame) {//没有配置简单模式就是直接正常模式
         return;
     }
 
     // mark radio frame as consumed
+    // 标记没有新的遥控器数据
     ap.new_radio_frame = false;
 
-    if (ap.simple_mode == 1) {
+    //总结：简单模式就是飞行器起飞时头部对准的方向始终为机体坐标系的pitch轴，
+    //也就是说启动的时候就定死了机体坐标系，所以遥控器需要传入的roll和pitch的值需要转到机体坐标系，再转到地球坐标系中
+    if (ap.simple_mode == 1) {//简单模式，头部对准的方向始终为机体方向
         // rotate roll, pitch input by -initial simple heading (i.e. north facing)
+        // 旋转滚转，俯仰输入-初始简单航向(即面向北)
         rollx = channel_roll->get_control_in()*simple_cos_yaw - channel_pitch->get_control_in()*simple_sin_yaw;
         pitchx = channel_roll->get_control_in()*simple_sin_yaw + channel_pitch->get_control_in()*simple_cos_yaw;
-    }else{
+    }else{//无头模式
         // rotate roll, pitch input by -super simple heading (reverse of heading to home)
+        // 旋转横滚，俯仰输入-超简单航向(倒向回家)
         rollx = channel_roll->get_control_in()*super_simple_cos_yaw - channel_pitch->get_control_in()*super_simple_sin_yaw;
         pitchx = channel_roll->get_control_in()*super_simple_sin_yaw + channel_pitch->get_control_in()*super_simple_cos_yaw;
     }
 
     // rotate roll, pitch input from north facing to vehicle's perspective
     channel_roll->set_control_in(rollx*ahrs.cos_yaw() + pitchx*ahrs.sin_yaw());
-    channel_pitch->set_control_in(-rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw());
+    channel_pitch->set_control_in(-rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw());//旋转到地理坐标系
 }
 
 // update_super_simple_bearing - adjusts simple bearing based on location

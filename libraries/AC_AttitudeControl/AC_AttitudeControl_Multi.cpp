@@ -353,7 +353,7 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     _rate_sysid_ang_vel.zero();
     _actuator_sysid.zero();
 
-    control_monitor_update();
+    control_monitor_update();//更新控制监视器
 }
 
 // sanity check parameters.  should be called once before takeoff

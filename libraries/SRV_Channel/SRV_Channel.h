@@ -542,9 +542,11 @@ private:
 
     static struct srv_function {
         // mask of what channels this applies to
+        // 标记哪个通道
         SRV_Channel::servo_mask_t channel_mask;
 
         // scaled output for this function
+        // 缩放输出
         int16_t output_scaled;
     } functions[SRV_Channel::k_nr_aux_servo_functions];
 

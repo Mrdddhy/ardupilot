@@ -82,7 +82,7 @@ public:
     bool                get_interlock() const { return _flags.interlock; }
 
     // set_roll, set_pitch, set_yaw, set_throttle
-    void                set_roll(float roll_in) { _roll_in = roll_in; };        // range -1 ~ +1
+    void                set_roll(float roll_in) { _roll_in = roll_in; };        // range -1 ~ +1 横滚角速度PID =_roll_in 
     void                set_roll_ff(float roll_in) { _roll_in_ff = roll_in; };    // range -1 ~ +1
     void                set_pitch(float pitch_in) { _pitch_in = pitch_in; };    // range -1 ~ +1
     void                set_pitch_ff(float pitch_in) { _pitch_in_ff = pitch_in; };  // range -1 ~ +1
@@ -123,11 +123,11 @@ public:
 
     // spool states
     enum class SpoolState : uint8_t {
-        SHUT_DOWN = 0,                      // all motors stop
-        GROUND_IDLE = 1,                    // all motors at ground idle
-        SPOOLING_UP = 2,                       // increasing maximum throttle while stabilizing
-        THROTTLE_UNLIMITED = 3,             // throttle is no longer constrained by start up procedure
-        SPOOLING_DOWN = 4,                     // decreasing maximum throttle while stabilizing
+        SHUT_DOWN = 0,                      //Motors停转无输出，Servos输出保持中立或测试条件值---all motors stop
+        GROUND_IDLE = 1,                    //Motors在地面空转---all motors at ground idle
+        SPOOLING_UP = 2,                    //Motors最大油门输出，Servos正常输出--- increasing maximum throttle while stabilizing
+        THROTTLE_UNLIMITED = 3,             //Motors正常输出，Servos正常输出--- throttle is no longer constrained by start up procedure
+        SPOOLING_DOWN = 4,                  //Motors最小输出，Servos正常输出--- decreasing maximum throttle while stabilizing
     };
 
     // get_spool_state - get current spool state

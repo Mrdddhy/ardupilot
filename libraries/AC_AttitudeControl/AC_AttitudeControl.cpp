@@ -269,6 +269,7 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
 
         // When yaw acceleration limiting is enabled, the yaw input shaper constrains angular acceleration about the yaw axis, slewing
         // the output rate towards the input rate.
+        // 这里区别直接输入期望偏航角的处理
         _attitude_target_euler_rate.z = input_shaping_ang_vel(_attitude_target_euler_rate.z, euler_yaw_rate, euler_accel.z, _dt);
 
         // Convert euler angle derivative of desired attitude into a body-frame angular velocity vector for feedforward
@@ -894,6 +895,7 @@ void AC_AttitudeControl::thrust_heading_rotation_angles(Quaternion& att_to_quat,
 
 // calculates the velocity correction from an angle error. The angular velocity has acceleration and
 // deceleration limits including basic jerk limiting using _input_tc
+// 调用开方控制器进行处理
 float AC_AttitudeControl::input_shaping_angle(float error_angle, float input_tc, float accel_max, float target_ang_vel, float dt)
 {
     // Calculate the velocity as error approaches zero with acceleration limited by accel_max_radss
@@ -907,7 +909,7 @@ float AC_AttitudeControl::input_shaping_angle(float error_angle, float input_tc,
 }
 
 // limits the acceleration and deceleration of a velocity request
-// 限制速度请求的加速和减速  
+// 限制速度请求的加速和减速，不明白！  
 float AC_AttitudeControl::input_shaping_ang_vel(float target_ang_vel, float desired_ang_vel, float accel_max, float dt)
 {
     // Acceleration is limited directly to smooth the beginning of the curve.

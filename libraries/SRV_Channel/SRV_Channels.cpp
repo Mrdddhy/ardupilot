@@ -208,7 +208,7 @@ void SRV_Channels::setup_failsafe_trim_all_non_motors(void)
 void SRV_Channels::calc_pwm(void)
 {
     for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
-        channels[i].calc_pwm(functions[channels[i].function].output_scaled);
+        channels[i].calc_pwm(functions[channels[i].function].output_scaled);//计算PWM值
     }
 }
 
