@@ -393,6 +393,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
         // we are initialised, but we don't return true until the IMU
         // buffer has been filled. This prevents a timing
         // vulnerability with a pause in IMU data during filter startup
+        /*我们被初始化，但我们不返回true，直到IMU缓冲区已经被填满，这防止了imu数据在过滤器启动期间暂停的定时漏洞*/
         readIMUData();
         readMagData();
         readGpsData();
@@ -556,7 +557,7 @@ void NavEKF2_core::CovarianceInit()
 void NavEKF2_core::UpdateFilter(bool predict)
 {
     // Set the flag to indicate to the filter that the front-end has given permission for a new state prediction cycle to be started
-    /*设置标志用来向ekf2滤波器，指示前端一允许启动新的状态预测周期*/
+    /*设置标志用来指示ekf2滤波器，指示前端一允许启动新的状态预测周期*/
     startPredictEnabled = predict;
 
     // don't run filter updates if states have not been initialised
@@ -587,7 +588,7 @@ void NavEKF2_core::UpdateFilter(bool predict)
     controlFilterModes();
 
     // read IMU data as delta angles and velocities
-    /*读取IMU数据作为角度和速度*/
+    /*读取IMU数据作为增量角度和速度*/
     readIMUData();
 
     // Run the EKF equations to estimate at the fusion time horizon if new IMU data is available in the buffer

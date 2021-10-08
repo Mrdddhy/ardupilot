@@ -79,12 +79,13 @@ AP_AHRS_DCM::update(bool skip_ins_update)
 
     if (!skip_ins_update) {
         // tell the IMU to grab some data
-        AP::ins().update();
+        AP::ins().update();//这里不会执行
     }
 
     const AP_InertialSensor &_ins = AP::ins();
 
     // ask the IMU how much time this sensor reading represents
+    // 获取IMU这个读数时所用增量时间delta_t
     delta_t = _ins.get_delta_time();
 
     // if the update call took more than 0.2 seconds then discard it,
@@ -97,31 +98,32 @@ AP_AHRS_DCM::update(bool skip_ins_update)
     }
 
     // Integrate the DCM matrix using gyro inputs
-    matrix_update(delta_t);
+    matrix_update(delta_t);//使用陀螺仪计算DCM矩阵
 
     // Normalize the DCM matrix
-    normalize();
+    normalize();//归一化DCM矩阵
 
     // Perform drift correction
-    drift_correction(delta_t);
+    drift_correction(delta_t);//漂移修正
 
     // paranoid check for bad values in the DCM matrix
-    check_matrix();
+    check_matrix();//矩阵异常值检测
 
     // Calculate pitch, roll, yaw for stabilization and navigation
-    euler_angles();
+    euler_angles();//计算欧拉角
 
     // update trig values including _cos_roll, cos_pitch
-    update_trig();
+    update_trig();//计算对应的三角函数值
 
     // update AOA and SSA
     update_AOA_SSA();
 
-    backup_attitude();
+    backup_attitude();//姿态数据备份
 }
 
 /*
   backup attitude to persistent_data for use in watchdog reset
+  用于看门狗复位的persistent_data备份姿态
  */
 void AP_AHRS_DCM::backup_attitude(void)
 {
@@ -132,6 +134,7 @@ void AP_AHRS_DCM::backup_attitude(void)
 }
 
 // update the DCM matrix using only the gyros
+// 仅仅使用陀螺仪来更新DCM矩阵
 void
 AP_AHRS_DCM::matrix_update(float _G_Dt)
 {
@@ -140,15 +143,22 @@ AP_AHRS_DCM::matrix_update(float _G_Dt)
     // and including the P terms would give positive feedback into
     // the _P_gain() calculation, which can lead to a very large P
     // value
+    /*注意：我们在_omega中没有包括P项，这是因为在_omega.length()中已经计算自旋率，包括P项将会
+      给 _P_gain()计算带来正反馈，将会导致一个比较大的P值
+     */
     _omega.zero();
 
     // average across first two healthy gyros. This reduces noise on
     // systems with more than one gyro. We don't use the 3rd gyro
     // unless another is unhealthy as 3rd gyro on PH2 has a lot more
     // noise
-    uint8_t healthy_count = 0;
-    Vector3f delta_angle;
+    /*在前两个陀螺仪上取平均，这降低了多个陀螺仪系统的噪声，我们不会使用
+      第三个陀螺仪除非有一个陀螺仪不健康，因为PH2上的第三个陀螺仪噪声更大
+    */
+    uint8_t healthy_count = 0;//陀螺仪健康个数
+    Vector3f delta_angle;//增量角度
     const AP_InertialSensor &_ins = AP::ins();
+    //这里如果使用了两个陀螺仪实例，也就是use_gyro(i)会设置对应实例为true，如果板载了3个陀螺仪，则get_gyro_count()返回3
     for (uint8_t i=0; i<_ins.get_gyro_count(); i++) {
         if (_ins.use_gyro(i) && healthy_count < 2) {
             Vector3f dangle;
@@ -162,7 +172,7 @@ AP_AHRS_DCM::matrix_update(float _G_Dt)
         delta_angle /= healthy_count;
     }
     if (_G_Dt > 0) {
-        _omega = delta_angle / _G_Dt;
+        _omega = delta_angle / _G_Dt;//计算w
         _omega += _omega_I;
         _dcm_matrix.rotate((_omega + _omega_P + _omega_yaw_P) * _G_Dt);
     }
@@ -352,7 +362,7 @@ AP_AHRS_DCM::normalize(void)
         // Our solution is blowing up and we will force back
         // to last euler angles
         _last_failure_ms = AP_HAL::millis();
-        AP_AHRS_DCM::reset(true);
+        AP_AHRS_DCM::reset(true);//我们的解是膨胀的，我们将强迫回到最后的欧拉角  
     }
 }
 
@@ -628,7 +638,8 @@ Vector3f AP_AHRS_DCM::ra_delayed(uint8_t instance, const Vector3f &ra)
 // gyro error. The _omega_P value is what pulls our attitude solution
 // back towards the reference vector quickly. The _omega_I term is an
 // attempt to learn the long term drift rate of the gyros.
-//
+/* 执行漂移修正.这个函数的目的是用我们对短期和长期陀螺误差的最佳估计来更新_omega_P
+   和_omega_I,_omega_P值将我们的态度解决快速拉回参考向量。_omega_I项是试图获悉陀螺的长期漂移率*/
 // This drift correction implementation is based on a paper
 // by Bill Premerlani from here:
 //   http://gentlenav.googlecode.com/files/RollPitchDriftCompensation.pdf
@@ -1023,7 +1034,7 @@ AP_AHRS_DCM::euler_angles(void)
     _body_dcm_matrix = _dcm_matrix * get_rotation_vehicle_body_to_autopilot_body();
     _body_dcm_matrix.to_euler(&roll, &pitch, &yaw);
 
-    update_cd_values();
+    update_cd_values();//欧拉角数据扩大100倍
 }
 
 // return our current position estimate using

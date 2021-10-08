@@ -105,7 +105,7 @@ void AP_AHRS_NavEKF::update(bool skip_ins_update)
     }
 
     /*skip_ins_update ==true*/
-    update_DCM(skip_ins_update);
+    update_DCM(skip_ins_update);//更新方向余弦矩阵
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     update_SITL();
@@ -153,12 +153,12 @@ void AP_AHRS_NavEKF::update_DCM(bool skip_ins_update)
     roll = _dcm_attitude.x;
     pitch = _dcm_attitude.y;
     yaw = _dcm_attitude.z;
-    update_cd_values();
+    update_cd_values();//上次(旧的)欧拉角角度数据扩大100倍
 
-    AP_AHRS_DCM::update(skip_ins_update);
+    AP_AHRS_DCM::update(skip_ins_update);//执行方向余弦矩阵更新
 
     // keep DCM attitude available for get_secondary_attitude()
-    _dcm_attitude(roll, pitch, yaw);
+    _dcm_attitude(roll, pitch, yaw);//让姿态保持可二次获取
 }
 
 void AP_AHRS_NavEKF::update_EKF2(void)
@@ -169,14 +169,15 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             start_time_ms = AP_HAL::millis();/*等待一秒用于DCM输出有效的倾斜估计*/
         }
         if (AP_HAL::millis() - start_time_ms > startup_delay_ms || _force_ekf) {
-            _ekf2_started = EKF2.InitialiseFilter();/*初始化EKF2，为运行EKF2做更新准备*/
+            _ekf2_started = EKF2.InitialiseFilter();/*初始化滤波器，为运行EKF2做更新准备*/
             if (_force_ekf) {
                 return;
             }
         }
     }
+    /*初始化完成后，EKF2开启，即_ekf2_started = 1*/
     if (_ekf2_started) {
-        EKF2.UpdateFilter();
+        EKF2.UpdateFilter();/*滤波器更新*/
         if (active_EKF_type() == EKF_TYPE2) {
             Vector3f eulers;
             EKF2.getRotationBodyToNED(_dcm_matrix);
@@ -196,6 +197,9 @@ void AP_AHRS_NavEKF::update_EKF2(void)
 
             // get gyro bias for primary EKF and change sign to give gyro drift
             // Note sign convention used by EKF is bias = measurement - truth
+            /*获得主EKF的陀螺仪偏差，并改变符号以给出陀螺仪的偏移
+             *注意EKF所使用的公约符号是偏差 = 测量值 - 真实值
+            */
             _gyro_drift.zero();
             EKF2.getGyroBias(-1,_gyro_drift);
             _gyro_drift = -_gyro_drift;

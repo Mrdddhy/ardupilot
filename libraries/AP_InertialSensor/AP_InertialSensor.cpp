@@ -1549,10 +1549,10 @@ check_sample:
  */
 bool AP_InertialSensor::get_delta_angle(uint8_t i, Vector3f &delta_angle) const
 {
-    if (_delta_angle_valid[i]) {
+    if (_delta_angle_valid[i]) {//如果增量角度直接可获取，则直接赋值并返回
         delta_angle = _delta_angle[i];
         return true;
-    } else if (get_gyro_health(i)) {
+    } else if (get_gyro_health(i)) {//如果不可直接获取，则获取陀螺仪数据，直接计算再返回
         // provide delta angle from raw gyro, so we use the same code
         // at higher level
         delta_angle = get_gyro(i) * get_delta_time();

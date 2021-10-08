@@ -315,7 +315,9 @@ void NavEKF2_core::detectFlight()
         Because of the differing certainty requirements of algorithms that need the in-flight / on-ground status we use two booleans where
         onGround indicates a high certainty we are not flying and inFlight indicates a high certainty we are flying. It is possible for
         both onGround and inFlight to be false if the status is uncertain, but they cannot both be true.
-
+     *  如果我们是向前飞的飞行器(如飞机)，那么空中状态可以通过速度和高度标准的组合来确定。
+        由于算法对飞行/地面状态的确定性要求不同，我们使用两个布尔值，其中onGround表示高度确定我们不飞行，inFight表示高度确定我们在飞行。
+        如果状态是不确定的，地面和飞行都有可能是假的，但他们不可能都是真的
         If we are a plane as indicated by the assume_zero_sideslip() status, then different logic is used
 
         TODO - this logic should be moved out of the EKF and into the flight vehicle code.
@@ -366,30 +368,30 @@ void NavEKF2_core::detectFlight()
         }
     } else {
         // Non fly forward vehicle, so can only use height and motor arm status
-
+        /*车辆不能向前飞，所以只能使用高度和电机解锁状态*/
         // If the motors are armed then we could be flying and if they are not armed then we are definitely not flying
         if (motorsArmed) {
-            onGround = false;
+            onGround = false;/*如果电机解锁，不确定，则将onGround置false*/
         } else {
-            inFlight = false;
+            inFlight = false;/*相反，未解锁，则肯定是在地面onGround*/
             onGround = true;
         }
-
+        /*如果电机解锁，则再根据高度变换判断是否在飞行状态*/
         if (!onGround) {
             // If height has increased since exiting on-ground, then we definitely are flying
             if ((stateStruct.position.z - posDownAtTakeoff) < -1.5f) {
-                inFlight = true;
+                inFlight = true;/*如果从地面出来后高度增加，那么我们肯定是在飞行*/
             }
 
             // If rangefinder has increased since exiting on-ground, then we definitely are flying
             if ((rangeDataNew.rng - rngAtStartOfFlight) > 0.5f) {
-                inFlight = true;
+                inFlight = true;/*如果离开地面后测距仪增加了，那么我们肯定是在飞行*/
             }
 
             // If more than 5 seconds since likely_flying was set
             // true, then set inFlight true
             if (_ahrs->get_time_flying_ms() > 5000) {
-                inFlight = true;
+                inFlight = true;/*如果likely_flying被设置为true后超过5秒，则设置inFight为true*/
             }
         }
 

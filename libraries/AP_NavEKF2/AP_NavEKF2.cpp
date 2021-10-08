@@ -619,10 +619,11 @@ void NavEKF2::check_log_write(void)
 
 
 // Initialise the filter
+/*初始化EKF滤波器*/
 bool NavEKF2::InitialiseFilter(void)
 {
     if (_enable == 0) {
-        return false;
+        return false;/*如果未使能EKF2，则返回false*/
     }
     /*获取传感器数据，gyro,acc*/
     const AP_InertialSensor &ins = AP::ins();
@@ -653,6 +654,7 @@ bool NavEKF2::InitialiseFilter(void)
         _imuMask.set(_imuMask.get() & mask);
         
         // count IMUs from mask
+        /*从mask计算IMU数目--对应核数目*/
         num_cores = 0;
         for (uint8_t i=0; i<7; i++) {
             if (_imuMask & (1U<<i)) {
@@ -727,6 +729,7 @@ bool NavEKF2::InitialiseFilter(void)
 */
 void NavEKF2::UpdateFilter(void)
 {
+    /*没有对应的核，直接返回*/
     if (!core) {
         return;
     }
@@ -742,7 +745,7 @@ void NavEKF2::UpdateFilter(void)
         // have already used more than 1/3 of the CPU budget for this
         // loop then suppress the prediction step. This allows
         // multiple EKF instances to cooperate on scheduling
-        /*如果我们没有超过3个IMU系时，或者我们已经在这个循环使用超过CPU的三分之一预算，然后抑制预测步骤，
+        /*如果我们没有超过3帧IMU时，或者我们已经在这个循环使用超过CPU的三分之一预算，然后抑制预测步骤，
          这样允许多个EKF实例协同调度？
         */
         if (core[i].getFramesSincePredict() < (_framesPerPrediction+3) &&
@@ -751,7 +754,7 @@ void NavEKF2::UpdateFilter(void)
         } else {
             statePredictEnabled[i] = true;
         }
-        core[i].UpdateFilter(statePredictEnabled[i]);
+        core[i].UpdateFilter(statePredictEnabled[i]);/*更新滤波器*/
     }
 
     // If the current core selected has a bad error score or is unhealthy, switch to a healthy core with the lowest fault score
