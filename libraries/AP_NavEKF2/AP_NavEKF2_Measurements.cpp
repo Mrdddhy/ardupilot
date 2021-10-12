@@ -297,6 +297,9 @@ void NavEKF2_core::readMagData()
  *  lower rate than 100Hz, then no downsampling or upsampling will be performed.
  *  Downsampling is done using a method that does not introduce coning or sculling
  *  errors.
+ * 读取IMU增量角和增量速度测量值，并向下采样到100Hz，存储在EKF使用的数据缓冲区中。 
+ * 如果IMU数据到达速率低于100Hz，则不进行下采样或上采样。 
+ * 下采样是使用一种不引入圆锥或划桨误差的方法进行的。
  */
 void NavEKF2_core::readIMUData()
 {
@@ -362,7 +365,7 @@ void NavEKF2_core::readIMUData()
     imuDataNew.gyro_index = gyro_index_active;
 
     // Get current time stamp
-    /*获取时间*/
+    /*获取时间戳*/
     imuDataNew.time_ms = imuSampleTime_ms;
 
     // use the most recent IMU index for the downsampled IMU
@@ -445,7 +448,7 @@ void NavEKF2_core::readIMUData()
         runUpdates = true;
 
         // extract the oldest available data from the FIFO buffer
-        /*设置标志，让过滤器知道它有新的IMU数据需要运行*/
+        /*从FIFO缓冲区提取最古老的可用数据*/
         imuDataDelayed = storedIMU.pop_oldest_element();
 
         // protect against delta time going to zero
@@ -466,6 +469,7 @@ void NavEKF2_core::readIMUData()
 
     } else {
         // we don't have new IMU data in the buffer so don't run filter updates on this time step
+        /*我们在缓冲区中没有新的IMU数据，所以不要在这个时间步骤上运行过滤器更新 */
         runUpdates = false;
     }
 }

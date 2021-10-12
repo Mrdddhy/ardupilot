@@ -389,17 +389,17 @@ private:
     // the states are available in two forms, either as a Vector31, or
     // broken down as individual elements. Both are equivalent (same
     // memory)
-    /*状态输入变量 ---28维*/
+    /*状态输入变量 ---28维，共有24个状态，四元数并不在状态向量中*/
     struct state_elements {
-        Vector3f    angErr;         // 0..2
-        Vector3f    velocity;       // 3..5
-        Vector3f    position;       // 6..8
-        Vector3f    gyro_bias;      // 9..11
-        Vector3f    gyro_scale;     // 12..14
-        float       accel_zbias;    // 15
-        Vector3f    earth_magfield; // 16..18
-        Vector3f    body_magfield;  // 19..21
-        Vector2f    wind_vel;       // 22..23
+        Vector3f    angErr;         // 0..2---三轴角度误差
+        Vector3f    velocity;       // 3..5---三轴速度(北东地坐标系)
+        Vector3f    position;       // 6..8---三轴位置(北东地坐标系)
+        Vector3f    gyro_bias;      // 9..11---陀螺仪三轴偏差
+        Vector3f    gyro_scale;     // 12..14---陀螺仪三轴比例因子
+        float       accel_zbias;    // 15-------加速度计Z轴偏差
+        Vector3f    earth_magfield; // 16..18---三轴地磁场(地磁场在北东地坐标系的三轴分量)
+        Vector3f    body_magfield;  // 19..21---三轴磁偏量(磁罗盘和机体坐标系没有对齐而产生的偏差)
+        Vector2f    wind_vel;       // 22..23---两轴风速(北东地坐标系下的北和东)
         Quaternion  quat;           // 24..27
     };
 
@@ -1105,11 +1105,11 @@ private:
     float meaHgtAtTakeOff;            // height measured at commencement of takeoff
 
     // control of post takeoff magentic field and heading resets
-    bool finalInflightYawInit;      // true when the final post takeoff initialisation of yaw angle has been performed
+    bool finalInflightYawInit;      // 当最后的起飞后偏航角初始化已经完成时为真--true when the final post takeoff initialisation of yaw angle has been performed
     bool finalInflightMagInit;      // true when the final post takeoff initialisation of magnetic field states been performed
     bool magStateResetRequest;      // true if magnetic field states need to be reset using the magneteomter measurements
     bool magYawResetRequest;        // true if the vehicle yaw and magnetic field states need to be reset using the magnetometer measurements
-    bool gpsYawResetRequest;        // true if the vehicle yaw needs to be reset to the GPS course
+    bool gpsYawResetRequest;        // 如果车辆偏航需要重置到GPS航向，则为真--true if the vehicle yaw needs to be reset to the GPS course
     float posDownAtLastMagReset;    // vertical position last time the mag states were reset (m)
     float yawInnovAtLastMagReset;   // magnetic yaw innovation last time the yaw and mag field states were reset (rad)
     Quaternion quatAtLastMagReset;  // quaternion states last time the mag states were reset

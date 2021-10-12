@@ -1095,6 +1095,7 @@ bool AP_InertialSensor::accel_calibrated_ok_all() const
 }
 
 // return true if accel instance should be used (must be healthy and have it's use parameter set to 1)
+/*如果加速度计实例应该使用则返回true(这个加速度计必须健康并且它的使用参数设置为1)*/
 bool AP_InertialSensor::use_accel(uint8_t instance) const
 {
     if (instance >= INS_MAX_INSTANCES) {

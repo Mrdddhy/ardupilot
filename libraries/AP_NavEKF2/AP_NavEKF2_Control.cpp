@@ -420,6 +420,7 @@ bool NavEKF2_core::assume_zero_sideslip(void) const
     // we don't assume zero sideslip for ground vehicles as EKF could
     // be quite sensitive to a rapid spin of the ground vehicle if
     // traction is lost
+    /*我们不假设地面车辆的侧滑为零，因为如果失去牵引力，EKF可能对地面车辆的快速旋转非常敏感*/
     return _ahrs->get_fly_forward() && _ahrs->get_vehicle_class() != AHRS_VEHICLE_GROUND;
 }
 

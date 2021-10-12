@@ -15,12 +15,17 @@ extern const AP_HAL::HAL& hal;
 ********************************************************/
 
 // Control reset of yaw and magnetic field states
+/*控制偏航和磁场状态置位*/
 void NavEKF2_core::controlMagYawReset()
 {
 
     // Vehicles that can use a zero sideslip assumption (Planes) are a special case
     // They can use the GPS velocity to recover from bad initial compass data
     // This allows recovery for heading alignment errors due to compass faults
+    /*能够使用零侧滑假设的车辆(飞机)是一个特例
+     *它们能使用GPS数据从错误的初始罗盘数据恢复过来
+     *这允许恢复由于罗盘故障导致的航向校准错误
+    */
     if (assume_zero_sideslip() && !finalInflightYawInit && inFlight ) {
         gpsYawResetRequest = true;
         return;
@@ -28,21 +33,21 @@ void NavEKF2_core::controlMagYawReset()
         gpsYawResetRequest = false;
     }
 
-    // Quaternion and delta rotation vector that are re-used for different calculations
+    //四元数和增量旋转向量重新使用做一些运算-- Quaternion and delta rotation vector that are re-used for different calculations
     Vector3f deltaRotVecTemp;
     Quaternion deltaQuatTemp;
 
     bool flightResetAllowed = false;
     bool initialResetAllowed = false;
     if (!finalInflightYawInit) {
-        // Use a quaternion division to calculate the delta quaternion between the rotation at the current and last time
+        //使用四元数除法来计算在当前四元数和上一次四元数之间的增量四元数-- Use a quaternion division to calculate the delta quaternion between the rotation at the current and last time
         deltaQuatTemp = stateStruct.quat / prevQuatMagReset;
         prevQuatMagReset = stateStruct.quat;
 
-        // convert the quaternion to a rotation vector and find its length
+        //将四元数转化成旋转向量和找到其长度-- convert the quaternion to a rotation vector and find its length
         deltaQuatTemp.to_axis_angle(deltaRotVecTemp);
 
-        // check if the spin rate is OK - high spin rates can cause angular alignment errors
+        //检查自旋速率是否正确--高自旋速率将导致角度对齐误差--- check if the spin rate is OK - high spin rates can cause angular alignment errors
         bool angRateOK = deltaRotVecTemp.length() < 0.1745f;
 
         initialResetAllowed = angRateOK;
@@ -50,116 +55,121 @@ void NavEKF2_core::controlMagYawReset()
 
     }
 
-    // Check if conditions for a interim or final yaw/mag reset are met
+    // 检查是否满足临时的或最终的偏航/磁场 重置---Check if conditions for a interim or final yaw/mag reset are met
     bool finalResetRequest = false;
     bool interimResetRequest = false;
     if (flightResetAllowed && !assume_zero_sideslip()) {
-        // check that we have reached a height where ground magnetic interference effects are insignificant
-        // and can perform a final reset of the yaw and field states
+        //检查我们到达的高度地面磁场干扰影响不显著--- check that we have reached a height where ground magnetic interference effects are insignificant
+        //并可以执行偏航和磁场状态的最终复位 and can perform a final reset of the yaw and field states
         finalResetRequest = (stateStruct.position.z  - posDownAtTakeoff) < -EKF2_MAG_FINAL_RESET_ALT;
 
-        // check for increasing height
+        // 检查高度的增长---check for increasing height
         bool hgtIncreasing = (posDownAtLastMagReset-stateStruct.position.z) > 0.5f;
         float yawInnovIncrease = fabsf(innovYaw) - fabsf(yawInnovAtLastMagReset);
 
-        // check for increasing yaw innovations
+        // 检查偏航残差的增长---check for increasing yaw innovations
         bool yawInnovIncreasing = yawInnovIncrease > 0.25f;
 
-        // check that the yaw innovations haven't been caused by a large change in attitude
+        // 检查偏航残差不是由大的姿态变化引起的---check that the yaw innovations haven't been caused by a large change in attitude
         deltaQuatTemp = quatAtLastMagReset / stateStruct.quat;
         deltaQuatTemp.to_axis_angle(deltaRotVecTemp);
         bool largeAngleChange = deltaRotVecTemp.length() > yawInnovIncrease;
 
         // if yaw innovations and height have increased and we haven't rotated much
         // then we are climbing away from a ground based magnetic anomaly and need to reset
+        /*如果偏航残差和高度增加，我们没有旋转太多，那么我们正在远离地面的磁异常，需要重置*/
         interimResetRequest = hgtIncreasing && yawInnovIncreasing && !largeAngleChange;
     }
 
-    // an initial reset is required if we have not yet aligned the yaw angle
+    //如果我们还没有对齐偏航角，则需要进行初始重置-- an initial reset is required if we have not yet aligned the yaw angle
     bool initialResetRequest = initialResetAllowed && !yawAlignComplete;
 
-    // a combined yaw angle and magnetic field reset can be initiated by:
-    magYawResetRequest = magYawResetRequest || // an external request
-            initialResetRequest || // an initial alignment performed by all vehicle types using magnetometer
-            interimResetRequest || // an interim alignment required to recover from ground based magnetic anomaly
-            finalResetRequest; // the final reset when we have acheived enough height to be in stable magnetic field environment
+    //可以通过以下方法启动偏航角和磁场复位组合-- a combined yaw angle and magnetic field reset can be initiated by:
+    magYawResetRequest = magYawResetRequest || // 一个外部的需要---an external request
+            initialResetRequest || // 所有车型使用磁力计进行初始对准 -an initial alignment performed by all vehicle types using magnetometer
+            interimResetRequest || // 为了从地面磁异常中恢复，需要临时校准---an interim alignment required to recover from ground based magnetic anomaly
+            finalResetRequest; //当我们达到足够的高度，以在稳定的磁场环境中，最终复位--- the final reset when we have acheived enough height to be in stable magnetic field environment
 
-    // Perform a reset of magnetic field states and reset yaw to corrected magnetic heading
+    //执行复位磁场状态和复位偏航到校正的磁航向-- Perform a reset of magnetic field states and reset yaw to corrected magnetic heading
     if (magYawResetRequest || magStateResetRequest || extNavYawResetRequest) {
 
-        // if a yaw reset has been requested, apply the updated quaternion to the current state
+        //如果已请求偏航重置，则将更新后的四元数应用到当前状态-- if a yaw reset has been requested, apply the updated quaternion to the current state
         if (extNavYawResetRequest) {
-            // get the euler angles from the current state estimate
+            //从当前状态估计得到欧拉角--- get the euler angles from the current state estimate
             Vector3f eulerAnglesOld;
             stateStruct.quat.to_euler(eulerAnglesOld.x, eulerAnglesOld.y, eulerAnglesOld.z);
 
-            // previous value used to calculate a reset delta
+            //用于计算重置增量的先前值-- previous value used to calculate a reset delta
             Quaternion prevQuat = stateStruct.quat;
 
-            // Get the Euler angles from the external vision data
+            //从外部视觉数据中得到欧拉角-- Get the Euler angles from the external vision data
             Vector3f eulerAnglesNew;
             extNavDataDelayed.quat.to_euler(eulerAnglesNew.x, eulerAnglesNew.y, eulerAnglesNew.z);
 
             // the new quaternion uses the old roll/pitch and new yaw angle
             stateStruct.quat.from_euler(eulerAnglesOld.x, eulerAnglesOld.y, eulerAnglesNew.z);
 
-            // calculate the change in the quaternion state and apply it to the ouput history buffer
+            // 计算四元数状态的变化，并将其应用到输出历史缓冲区--calculate the change in the quaternion state and apply it to the ouput history buffer
             prevQuat = stateStruct.quat/prevQuat;
             StoreQuatRotate(prevQuat);
 
-            // send initial alignment status to console
+            //发送初始对准状态到控制台-- send initial alignment status to console
             if (!yawAlignComplete) {
                 gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u ext nav yaw alignment complete",(unsigned)imu_index);
             }
 
             // record the reset as complete and also record the in-flight reset as complete to stop further resets when height is gained
             // in-flight reset is unnecessary because we do not need to consider ground based magnetic anomaly effects
+            // 记录复位完成，也记录飞行中复位完成，以在高度增加时停止进一步复位
+            // 飞行中的复位是不必要的，因为我们不需要考虑基于地面的磁异常影响
             yawAlignComplete = true;
             finalInflightYawInit = true;
 
-            // clear the yaw reset request flag
+            //清除偏航重置请求标志-- clear the yaw reset request flag
             extNavYawResetRequest = false;
 
         } else if (magYawResetRequest || magStateResetRequest) {
-            // get the euler angles from the current state estimate
+            // 从当前状态估计得到欧拉角---get the euler angles from the current state estimate
             Vector3f eulerAngles;
             stateStruct.quat.to_euler(eulerAngles.x, eulerAngles.y, eulerAngles.z);
 
             // Use the Euler angles and magnetometer measurement to update the magnetic field states
             // and get an updated quaternion
+            // 使用欧拉角和磁力计测量更新磁场状态，并得到更新的四元数  
             Quaternion newQuat = calcQuatAndFieldStates(eulerAngles.x, eulerAngles.y);
 
             if (magYawResetRequest) {
-                // previous value used to calculate a reset delta
+                // 用于计算重置增量的先前值---previous value used to calculate a reset delta
                 Quaternion prevQuat = stateStruct.quat;
 
-                // update the quaternion states using the new yaw angle
+                // 使用新的偏航角更新四元数状态---update the quaternion states using the new yaw angle
                 stateStruct.quat = newQuat;
 
-                // calculate the change in the quaternion state and apply it to the ouput history buffer
+                //计算四元数状态的变化，并将其应用到输出历史缓冲区-- calculate the change in the quaternion state and apply it to the ouput history buffer
                 prevQuat = stateStruct.quat/prevQuat;
                 StoreQuatRotate(prevQuat);
 
-                // send initial alignment status to console
+                //发送初始对准状态到控制台-- send initial alignment status to console
                 if (!yawAlignComplete) {
                     gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u initial yaw alignment complete",(unsigned)imu_index);
                 }
 
-                // send in-flight yaw alignment status to console
+                //将飞行中偏航对准状态发送到控制台--- send in-flight yaw alignment status to console
                 if (finalResetRequest) {
                     gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u in-flight yaw alignment complete",(unsigned)imu_index);
                 } else if (interimResetRequest) {
                     gcs().send_text(MAV_SEVERITY_WARNING, "EKF2 IMU%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index);
                 }
 
-                // update the yaw reset completed status
+                //更新偏航重置完成状态-- update the yaw reset completed status
                 recordYawReset();
 
-                // clear the yaw reset request flag
+                //清除偏航重置请求标志-- clear the yaw reset request flag
                 magYawResetRequest = false;
 
                 // clear the complete flags if an interim reset has been performed to allow subsequent
                 // and final reset to occur
+                // 如果执行了临时重置以允许随后和最终的重置发生，则清除完成标志 
                 if (interimResetRequest) {
                     finalInflightYawInit = false;
                     finalInflightMagInit = false;
@@ -234,12 +244,17 @@ void NavEKF2_core::SelectMagFusion()
 
     // clear the flag that lets other processes know that the expensive magnetometer fusion operation has been performed on that time step
     // used for load levelling
+    /*清除标志，让其他进程知道昂贵的磁力计融合操作已经在该时间步上执行 
+     *用于负载均衡
+    */
     magFusePerformed = false;
 
     // check for and read new magnetometer measurements
+    /*检查并读取新的磁力计测量值 */
     readMagData();
 
     // If we are using the compass and the magnetometer has been unhealthy for too long we declare a timeout
+    /*如果我们使用指南针和磁力计已经不健康太长时间，我们宣布一个超时*/
     if (magHealth) {
         magTimeout = false;
         lastHealthyMagTime_ms = imuSampleTime_ms;
@@ -248,47 +263,59 @@ void NavEKF2_core::SelectMagFusion()
     }
 
     // check for availability of magnetometer data to fuse
+    /*检查磁力计数据是否可用*/
     magDataToFuse = storedMag.recall(magDataDelayed,imuDataDelayed.time_ms);
 
     // Control reset of yaw and magnetic field states if we are using compass data
+    /*如果我们使用罗盘数据，控制偏航和磁场状态的复位 */
     if (magDataToFuse && use_compass()) {
         controlMagYawReset();
     }
 
     // determine if conditions are right to start a new fusion cycle
     // wait until the EKF time horizon catches up with the measurement
+    /*确定开始一个新的融合循环的条件是否合适，直到EKF时间范围赶上测量值*/
     bool dataReady = (magDataToFuse && statesInitialised && use_compass() && yawAlignComplete);
     if (dataReady) {
         // use the simple method of declination to maintain heading if we cannot use the magnetic field states
+        /*如果不能利用磁场状态，就用简单的磁倾角法来保持航向*/
         if(inhibitMagStates || magStateResetRequest || !magStateInitComplete) {
-            fuseEulerYaw();
+            fuseEulerYaw();//对偏航角修正
             // zero the test ratio output from the inactive 3-axis magnetometer fusion
+            /*将非活动的三轴磁强计融合输出的测试比调零*/
             magTestRatio.zero();
         } else {
             // if we are not doing aiding with earth relative observations (eg GPS) then the declination is
             // maintained by fusing declination as a synthesised observation
             // We also fuse declination if we are using the WMM tables
+            /*如果我们没有借助地球相对观测(如GPS)，那么倾角就是通过倾角作为综合观测来维持的，如果我们
+              使用WMM表，我们也会融合倾角
+            */
             if (PV_AidingMode != AID_ABSOLUTE ||
                 (frontend->_mag_ef_limit > 0 && have_table_earth_field)) {
                 FuseDeclination(0.34f);
             }
             // fuse the three magnetometer componenents sequentially
+            /*依次融合磁强计三个分量*/
             for (mag_state.obsIndex = 0; mag_state.obsIndex <= 2; mag_state.obsIndex++) {
                 hal.util->perf_begin(_perf_test[0]);
-                FuseMagnetometer();
+                FuseMagnetometer();//融合磁力计
                 hal.util->perf_end(_perf_test[0]);
                 // don't continue fusion if unhealthy
+                /*如果不健康，就不要继续融合*/
                 if (!magHealth) {
                     break;
                 }
             }
             // zero the test ratio output from the inactive simple magnetometer yaw fusion
+            /*非活动简单磁强计偏航融合的测试比输出*/
             yawTestRatio = 0.0f;
         }
     }
 
     // If we have no magnetometer and are on the ground, fuse in a synthetic heading measurement to prevent the
     // filter covariances from becoming badly conditioned
+    /*如果我们没有磁力计，在地面上，融合成一个航向测量防止滤波器协方差变化*/
     if (!use_compass()) {
         if (onGround && (imuSampleTime_ms - lastYawTime_ms > 1000)) {
             fuseEulerYaw();
@@ -299,11 +326,13 @@ void NavEKF2_core::SelectMagFusion()
 
     // If the final yaw reset has been performed and the state variances are sufficiently low
     // record that the earth field has been learned.
+    /*如果最终的偏航复位已经完成，并且状态方差足够低，记录地球磁场已经被了解*/
     if (!magFieldLearned && finalInflightMagInit) {
         magFieldLearned = (P[16][16] < sq(0.01f)) && (P[17][17] < sq(0.01f)) && (P[18][18] < sq(0.01f));
     }
 
     // record the last learned field variances
+    /*记录最后学到的场方差*/
     if (magFieldLearned && !inhibitMagStates) {
         earthMagFieldVar.x = P[16][16];
         earthMagFieldVar.y = P[17][17];

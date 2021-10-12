@@ -180,7 +180,7 @@ static inline constexpr float degrees(float rad)
 template<typename T>
 float sq(const T val)
 {
-    float v = static_cast<float>(val);
+    float v = static_cast<float>(val);//static_cast强制转换
     return v*v;
 }
 

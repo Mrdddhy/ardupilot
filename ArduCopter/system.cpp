@@ -315,7 +315,7 @@ void Copter::startup_INS_ground()
     ins.init(scheduler.get_loop_rate_hz());/*预热和校准陀螺仪偏差*/
 
     // reset ahrs including gyro bias
-    ahrs.reset();
+    ahrs.reset();//初始化EKF
 }
 
 // update the harmonic notch filter center frequency dynamically

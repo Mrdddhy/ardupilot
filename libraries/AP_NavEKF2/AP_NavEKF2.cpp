@@ -120,7 +120,7 @@
 
 extern const AP_HAL::HAL& hal;
 
-// Define tuning parameters
+//定义EKF2中的一些调整参数--- Define tuning parameters
 const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: ENABLE
@@ -129,6 +129,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @Values: 0:Disabled, 1:Enabled
     // @User: Advanced
     // @RebootRequired: True
+    // EKF2使能参数
     AP_GROUPINFO_FLAGS("ENABLE", 0, NavEKF2, _enable, 1, AP_PARAM_FLAG_ENABLE),
 
     // GPS measurement parameters
@@ -138,6 +139,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @Description: This controls use of GPS measurements : 0 = use 3D velocity & 2D position, 1 = use 2D velocity and 2D position, 2 = use 2D position, 3 = Inhibit GPS use - this can be useful when flying with an optical flow sensor in an environment where GPS quality is poor and subject to large multipath errors.
     // @Values: 0:GPS 3D Vel and 2D Pos, 1:GPS 2D vel and 2D pos, 2:GPS 2D pos, 3:No GPS
     // @User: Advanced
+    // GPS类型选择参数
     AP_GROUPINFO("GPS_TYPE", 1, NavEKF2, _fusionModeGPS, 0),
 
     // @Param: VELNE_M_NSE
@@ -698,7 +700,7 @@ bool NavEKF2::InitialiseFilter(void)
         }
 
         // Set the primary initially to be the lowest index
-        /*最初将主索引设置为最低索引*/
+        /*所有滤波器基本环境初始化成功后，最后将主索引设置为最低索引，即为0*/
         primary = 0;
     }
 
@@ -710,14 +712,14 @@ bool NavEKF2::InitialiseFilter(void)
     /*EKF内核初始化，我们将会成功返回当且仅当所有的核都初始化成功*/
     bool ret = true;
     for (uint8_t i=0; i<num_cores; i++) {
-        ret &= core[i].InitialiseFilterBootstrap();
+        ret &= core[i].InitialiseFilterBootstrap();//---重点函数--
     }
 
     // zero the structs used capture reset events
     /*将捕获重置事件所使用的结构置零*/
     memset(&yaw_reset_data, 0, sizeof(yaw_reset_data));
     memset((void *)&pos_reset_data, 0, sizeof(pos_reset_data));
-    memset(&pos_down_reset_data, 0, sizeof(pos_down_reset_data));
+    memset(&pos_down_reset_data, 0, sizeof(pos_down_reset_data));//清零三个结构体
 
     check_log_write();
     return ret;
@@ -745,8 +747,8 @@ void NavEKF2::UpdateFilter(void)
         // have already used more than 1/3 of the CPU budget for this
         // loop then suppress the prediction step. This allows
         // multiple EKF instances to cooperate on scheduling
-        /*如果我们没有超过3帧IMU时，或者我们已经在这个循环使用超过CPU的三分之一预算，然后抑制预测步骤，
-         这样允许多个EKF实例协同调度？
+        /*如果我们没有超过3帧IMU时，同时我们已经在这个循环使用超过CPU的三分之一预算，然后抑制预测步骤，
+         这样允许多个EKF实例协同调度
         */
         if (core[i].getFramesSincePredict() < (_framesPerPrediction+3) &&
             (AP_HAL::micros() - ins.get_last_update_usec()) > _frameTimeUsec/3) {

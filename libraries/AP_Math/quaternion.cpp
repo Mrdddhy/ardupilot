@@ -21,6 +21,7 @@
 #include "AP_Math.h"
 
 // return the rotation matrix equivalent for this quaternion
+// 转换成四元数对应的旋转矩阵
 void Quaternion::rotation_matrix(Matrix3f &m) const
 {
     const float q3q3 = q3 * q3;
@@ -153,14 +154,14 @@ void Quaternion::from_vector312(float roll ,float pitch, float yaw)
 
 void Quaternion::from_axis_angle(Vector3f v)
 {
-    const float theta = v.length();
+    const float theta = v.length();/*获得向量v的长度*/
     if (is_zero(theta)) {
         q1 = 1.0f;
-        q2=q3=q4=0.0f;
+        q2=q3=q4=0.0f;/*如果向量v的长度为0，直接返回单位四元数*/
         return;
     }
-    v /= theta;
-    from_axis_angle(v,theta);
+    v /= theta;/*向量v单位化，即每一个元素除以长度值，即v为单位轴*/
+    from_axis_angle(v,theta);/*由轴角进而获得四元数*/
 }
 
 void Quaternion::from_axis_angle(const Vector3f &axis, float theta)
@@ -173,7 +174,7 @@ void Quaternion::from_axis_angle(const Vector3f &axis, float theta)
     }
     const float st2 = sinf(theta/2.0f);
 
-    q1 = cosf(theta/2.0f);
+    q1 = cosf(theta/2.0f);/*展开相乘得到四元数*/
     q2 = axis.x * st2;
     q3 = axis.y * st2;
     q4 = axis.z * st2;
@@ -182,8 +183,8 @@ void Quaternion::from_axis_angle(const Vector3f &axis, float theta)
 void Quaternion::rotate(const Vector3f &v)
 {
     Quaternion r;
-    r.from_axis_angle(v);
-    (*this) *= r;
+    r.from_axis_angle(v);//获得增量四元数
+    (*this) *= r;//获得四元数
 }
 
 void Quaternion::to_axis_angle(Vector3f &v)
@@ -339,7 +340,7 @@ Quaternion &Quaternion::operator*=(const Quaternion &v)
     const float y2 = v.q3;
     const float z2 = v.q4;
 
-    q1 = w1*w2 - x1*x2 - y1*y2 - z1*z2;
+    q1 = w1*w2 - x1*x2 - y1*y2 - z1*z2;/*两个四元数乘法运算*/
     q2 = w1*x2 + x1*w2 + y1*z2 - z1*y2;
     q3 = w1*y2 - x1*z2 + y1*w2 + z1*x2;
     q4 = w1*z2 + x1*y2 - y1*x2 + z1*w2;

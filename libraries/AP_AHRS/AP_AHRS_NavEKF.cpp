@@ -177,7 +177,9 @@ void AP_AHRS_NavEKF::update_EKF2(void)
     }
     /*初始化完成后，EKF2开启，即_ekf2_started = 1*/
     if (_ekf2_started) {
-        EKF2.UpdateFilter();/*滤波器更新*/
+        
+        EKF2.UpdateFilter();/*--滤波器更新--*/
+
         if (active_EKF_type() == EKF_TYPE2) {
             Vector3f eulers;
             EKF2.getRotationBodyToNED(_dcm_matrix);
@@ -394,10 +396,10 @@ void AP_AHRS_NavEKF::reset(bool recover_eulers)
     // support locked access functions to AHRS data
     WITH_SEMAPHORE(_rsem);
     
-    AP_AHRS_DCM::reset(recover_eulers);
-    _dcm_attitude(roll, pitch, yaw);
+    AP_AHRS_DCM::reset(recover_eulers);//复位DCM
+    _dcm_attitude(roll, pitch, yaw);//初始化姿态
     if (_ekf2_started) {
-        _ekf2_started = EKF2.InitialiseFilter();
+        _ekf2_started = EKF2.InitialiseFilter();//初始化EKF2
     }
     if (_ekf3_started) {
         _ekf3_started = EKF3.InitialiseFilter();
