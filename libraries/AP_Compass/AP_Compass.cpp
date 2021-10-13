@@ -1629,6 +1629,7 @@ void Compass::try_set_initial_location()
     // if automatic declination is configured, then compute
     // the declination based on the initial GPS fix
     // Set the declination based on the lat/lng from GPS
+    /*如果配置了自动磁偏角计算，则基于GPS得到的经纬度进行磁偏角计算*/
     _declination.set(radians(
                          AP_Declination::get_declination(
                              (float)loc.lat / 10000000,

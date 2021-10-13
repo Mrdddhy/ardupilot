@@ -1662,51 +1662,55 @@ void NavEKF2_core::calcEarthRateNED(Vector3f &omega, int32_t latitude) const
 
 // initialise the earth magnetic field states using declination, suppled roll/pitch
 // and magnetometer measurements and return initial attitude quaternion
+/*使用磁偏角、补充的横滚和俯仰和磁力计测量来初始化地磁场状态，并返回初始姿态四元数*/
 Quaternion NavEKF2_core::calcQuatAndFieldStates(float roll, float pitch)
 {
-    // declare local variables required to calculate initial orientation and magnetic field
+    //声明需要的局部变量来计算初始方位和磁场-- declare local variables required to calculate initial orientation and magnetic field
     float yaw;
     Matrix3f Tbn;
     Vector3f initMagNED;
     Quaternion initQuat;
 
     if (use_compass()) {
-        // calculate rotation matrix from body to NED frame
+        //计算从机体系到NED坐标系的旋转矩阵--- calculate rotation matrix from body to NED frame
         Tbn.from_euler(roll, pitch, 0.0f);
 
-        // read the magnetometer data
+        //读取磁力计数据--- read the magnetometer data
         readMagData();
 
-        // rotate the magnetic field into NED axes
+        //将磁力计数据转换到NED轴上-- rotate the magnetic field into NED axes
         initMagNED = Tbn * magDataDelayed.mag;
 
-        // calculate heading of mag field rel to body heading
+        //计算磁场的航向与机体航向-- calculate heading of mag field rel to body heading
         float magHeading = atan2f(initMagNED.y, initMagNED.x);
 
-        // get the magnetic declination
+        //获得磁偏角-- get the magnetic declination
         float magDecAng = MagDeclination();
 
-        // calculate yaw angle rel to true north
+        //计算偏航角与真北的关系-- calculate yaw angle rel to true north
         yaw = magDecAng - magHeading;
 
-        // calculate initial filter quaternion states using yaw from magnetometer
-        // store the yaw change so that it can be retrieved externally for use by the control loops to prevent yaw disturbances following a reset
+        //利用磁力计的偏航计算初始滤波四元数状态 -- calculate initial filter quaternion states using yaw from magnetometer
+        //存储偏航变化，以便它可以从外部检索，由控制回路使用，以防止在复位后的偏航扰动-- store the yaw change so that it can be retrieved externally for use by the control loops to prevent yaw disturbances following a reset
         Vector3f tempEuler;
         stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
-        // this check ensures we accumulate the resets that occur within a single iteration of the EKF
+        //这个检查确保我们积累了在EKF的单个迭代中发生的重置-- this check ensures we accumulate the resets that occur within a single iteration of the EKF
         if (imuSampleTime_ms != lastYawReset_ms) {
             yawResetAngle = 0.0f;
         }
         yawResetAngle += wrap_PI(yaw - tempEuler.z);
         lastYawReset_ms = imuSampleTime_ms;
-        // calculate an initial quaternion using the new yaw value
+        //使用新的偏航值计算初始四元数 -- calculate an initial quaternion using the new yaw value
         initQuat.from_euler(roll, pitch, yaw);
-        // zero the attitude covariances because the corelations will now be invalid
+        //使姿态协方差为零，因为协关系现在无效了--zero the attitude covariances because the corelations will now be invalid
         zeroAttCovOnly();
 
         // calculate initial Tbn matrix and rotate Mag measurements into NED
         // to set initial NED magnetic field states
         // don't do this if the earth field has already been learned
+        /*计算初始Tbn矩阵，将Mag测量值旋转到NED中，设定初始NED磁场态
+          如果已经学过地球磁场，就不要这样做 
+        */
         if (!magFieldLearned) {
             initQuat.rotation_matrix(Tbn);
             if (have_table_earth_field && frontend->_mag_ef_limit > 0) {
@@ -1717,9 +1721,11 @@ Quaternion NavEKF2_core::calcQuatAndFieldStates(float roll, float pitch)
 
             // set the NE earth magnetic field states using the published declination
             // and set the corresponding variances and covariances
+            /*用公布的磁偏角设置东北向磁场状态，并设置相应的方差和协方差*/
             alignMagStateDeclination();
 
-            // set the remaining variances and covariances
+            //设置方差和协方差与原来一致-- set the remaining variances and covariances
+            /**/
             zeroRows(P,18,21);
             zeroCols(P,18,21);
             P[18][18] = sq(frontend->_magNoise);
@@ -1729,33 +1735,35 @@ Quaternion NavEKF2_core::calcQuatAndFieldStates(float roll, float pitch)
 
         }
 
-        // record the fact we have initialised the magnetic field states
+        //记录我们已经初始化国磁场状态-- record the fact we have initialised the magnetic field states
         recordMagReset();
 
-        // clear mag state reset request
+        //清除磁场重置请求标志-- clear mag state reset request
         magStateResetRequest = false;
 
     } else {
         // this function should not be called if there is no compass data but if is is, return the
         // current attitude
+        /*如果没有罗盘数据，则不应调用此函数，但如果是，则返回当前的态度  */
         initQuat = stateStruct.quat;
     }
 
-    // return attitude quaternion
+    //返回姿态四元数-- return attitude quaternion
     return initQuat;
 }
 
 // zero the attitude covariances, but preserve the variances
+// 将姿态协方差置0，但是保留方差
 void NavEKF2_core::zeroAttCovOnly()
 {
     float varTemp[3];
     for (uint8_t index=0; index<=2; index++) {
-        varTemp[index] = P[index][index];
+        varTemp[index] = P[index][index];//中间数组保存方差数值
     }
-    zeroCols(P,0,2);
-    zeroRows(P,0,2);
+    zeroCols(P,0,2);//让协方差P:0~2列置0
+    zeroRows(P,0,2);//让协方差P:0~2行置0
     for (uint8_t index=0; index<=2; index++) {
-        P[index][index] = varTemp[index];
+        P[index][index] = varTemp[index];//赋值得到协方差矩阵的对角线数值即方差
     }
 }
 

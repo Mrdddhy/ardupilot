@@ -39,7 +39,7 @@ void NavEKF2_core::controlMagYawReset()
 
     bool flightResetAllowed = false;
     bool initialResetAllowed = false;
-    if (!finalInflightYawInit) {
+    if (!finalInflightYawInit) {/*如果最后起飞偏航角没有初始化完成*/
         //使用四元数除法来计算在当前四元数和上一次四元数之间的增量四元数-- Use a quaternion division to calculate the delta quaternion between the rotation at the current and last time
         deltaQuatTemp = stateStruct.quat / prevQuatMagReset;
         prevQuatMagReset = stateStruct.quat;
@@ -50,8 +50,8 @@ void NavEKF2_core::controlMagYawReset()
         //检查自旋速率是否正确--高自旋速率将导致角度对齐误差--- check if the spin rate is OK - high spin rates can cause angular alignment errors
         bool angRateOK = deltaRotVecTemp.length() < 0.1745f;
 
-        initialResetAllowed = angRateOK;
-        flightResetAllowed = angRateOK && !onGround;
+        initialResetAllowed = angRateOK;/*初始重置允许状态位*/
+        flightResetAllowed = angRateOK && !onGround;/*飞行重置允许状态位*/
 
     }
 
@@ -61,7 +61,7 @@ void NavEKF2_core::controlMagYawReset()
     if (flightResetAllowed && !assume_zero_sideslip()) {
         //检查我们到达的高度地面磁场干扰影响不显著--- check that we have reached a height where ground magnetic interference effects are insignificant
         //并可以执行偏航和磁场状态的最终复位 and can perform a final reset of the yaw and field states
-        finalResetRequest = (stateStruct.position.z  - posDownAtTakeoff) < -EKF2_MAG_FINAL_RESET_ALT;
+        finalResetRequest = (stateStruct.position.z  - posDownAtTakeoff) < -EKF2_MAG_FINAL_RESET_ALT;//最终重置位
 
         // 检查高度的增长---check for increasing height
         bool hgtIncreasing = (posDownAtLastMagReset-stateStruct.position.z) > 0.5f;
@@ -77,7 +77,7 @@ void NavEKF2_core::controlMagYawReset()
 
         // if yaw innovations and height have increased and we haven't rotated much
         // then we are climbing away from a ground based magnetic anomaly and need to reset
-        /*如果偏航残差和高度增加，我们没有旋转太多，那么我们正在远离地面的磁异常，需要重置*/
+        /*如果偏航残差和高度增加，我们没有旋转太多(大的姿态误差)，那么我们正在远离地面的磁异常，需要临时重置*/
         interimResetRequest = hgtIncreasing && yawInnovIncreasing && !largeAngleChange;
     }
 
@@ -87,14 +87,14 @@ void NavEKF2_core::controlMagYawReset()
     //可以通过以下方法启动偏航角和磁场复位组合-- a combined yaw angle and magnetic field reset can be initiated by:
     magYawResetRequest = magYawResetRequest || // 一个外部的需要---an external request
             initialResetRequest || // 所有车型使用磁力计进行初始对准 -an initial alignment performed by all vehicle types using magnetometer
-            interimResetRequest || // 为了从地面磁异常中恢复，需要临时校准---an interim alignment required to recover from ground based magnetic anomaly
+            interimResetRequest || // 为了从地面磁异常中恢复，需要临时对准---an interim alignment required to recover from ground based magnetic anomaly
             finalResetRequest; //当我们达到足够的高度，以在稳定的磁场环境中，最终复位--- the final reset when we have acheived enough height to be in stable magnetic field environment
 
     //执行复位磁场状态和复位偏航到校正的磁航向-- Perform a reset of magnetic field states and reset yaw to corrected magnetic heading
     if (magYawResetRequest || magStateResetRequest || extNavYawResetRequest) {
 
         //如果已请求偏航重置，则将更新后的四元数应用到当前状态-- if a yaw reset has been requested, apply the updated quaternion to the current state
-        if (extNavYawResetRequest) {
+        if (extNavYawResetRequest) {//当请求使用外部导航数据重置车辆偏航时为真
             //从当前状态估计得到欧拉角--- get the euler angles from the current state estimate
             Vector3f eulerAnglesOld;
             stateStruct.quat.to_euler(eulerAnglesOld.x, eulerAnglesOld.y, eulerAnglesOld.z);
@@ -106,7 +106,7 @@ void NavEKF2_core::controlMagYawReset()
             Vector3f eulerAnglesNew;
             extNavDataDelayed.quat.to_euler(eulerAnglesNew.x, eulerAnglesNew.y, eulerAnglesNew.z);
 
-            // the new quaternion uses the old roll/pitch and new yaw angle
+            //从欧拉角转换成四元数--the new quaternion uses the old roll/pitch and new yaw angle
             stateStruct.quat.from_euler(eulerAnglesOld.x, eulerAnglesOld.y, eulerAnglesNew.z);
 
             // 计算四元数状态的变化，并将其应用到输出历史缓冲区--calculate the change in the quaternion state and apply it to the ouput history buffer
@@ -122,10 +122,10 @@ void NavEKF2_core::controlMagYawReset()
             // in-flight reset is unnecessary because we do not need to consider ground based magnetic anomaly effects
             // 记录复位完成，也记录飞行中复位完成，以在高度增加时停止进一步复位
             // 飞行中的复位是不必要的，因为我们不需要考虑基于地面的磁异常影响
-            yawAlignComplete = true;
-            finalInflightYawInit = true;
+            yawAlignComplete = true;//设置yaw对准完成标志位
+            finalInflightYawInit = true;//设置最后起飞后偏航初始化标志位
 
-            //清除偏航重置请求标志-- clear the yaw reset request flag
+            //清除外部导航数据偏航重置请求标志-- clear the yaw reset request flag
             extNavYawResetRequest = false;
 
         } else if (magYawResetRequest || magStateResetRequest) {
@@ -275,10 +275,10 @@ void NavEKF2_core::SelectMagFusion()
     // determine if conditions are right to start a new fusion cycle
     // wait until the EKF time horizon catches up with the measurement
     /*确定开始一个新的融合循环的条件是否合适，直到EKF时间范围赶上测量值*/
-    bool dataReady = (magDataToFuse && statesInitialised && use_compass() && yawAlignComplete);
+    bool dataReady = (magDataToFuse && statesInitialised && use_compass() && yawAlignComplete);//数据就绪标志位
     if (dataReady) {
         // use the simple method of declination to maintain heading if we cannot use the magnetic field states
-        /*如果不能利用磁场状态，就用简单的磁倾角法来保持航向*/
+        /*如果不能利用磁场状态，就用简单的磁偏角法来保持航向*/
         if(inhibitMagStates || magStateResetRequest || !magStateInitComplete) {
             fuseEulerYaw();//对偏航角修正
             // zero the test ratio output from the inactive 3-axis magnetometer fusion
@@ -288,8 +288,8 @@ void NavEKF2_core::SelectMagFusion()
             // if we are not doing aiding with earth relative observations (eg GPS) then the declination is
             // maintained by fusing declination as a synthesised observation
             // We also fuse declination if we are using the WMM tables
-            /*如果我们没有借助地球相对观测(如GPS)，那么倾角就是通过倾角作为综合观测来维持的，如果我们
-              使用WMM表，我们也会融合倾角
+            /*如果我们没有借助地球相对观测(如GPS)，那么磁偏角就是通过次磁偏角作为综合观测来维持的，
+              如果我们使用WMM表，我们也会融合磁偏角
             */
             if (PV_AidingMode != AID_ABSOLUTE ||
                 (frontend->_mag_ef_limit > 0 && have_table_earth_field)) {
@@ -785,13 +785,17 @@ void NavEKF2_core::FuseMagnetometer()
 
 
 /*
- * Fuse magnetic heading measurement using explicit algebraic equations generated with Matlab symbolic toolbox.
+ * 利用Matlab符号工具箱生成的显式代数方程测量融合磁航向--Fuse magnetic heading measurement using explicit algebraic equations generated with Matlab symbolic toolbox.
  * The script file used to generate these and other equations in this filter can be found here:
  * https://github.com/priseborough/InertialNav/blob/master/derivations/RotationVectorAttitudeParameterisation/GenerateNavFilterEquations.m
  * This fusion method only modifies the orientation, does not require use of the magnetic field states and is computationally cheaper.
+ * 这种融合方法只修改方向，不需要使用磁场状态，计算成本更低。
  * It is suitable for use when the external magnetic field environment is disturbed (eg close to metal structures, on ground).
+ * 它适用于外部磁场环境受到干扰时使用（如靠近金属结构、地面）
  * It is not as robust to magnetometer failures.
+ * 它对磁强计故障的鲁棒性较差
  * It is not suitable for operation where the horizontal magnetic field strength is weak (within 30 degrees latitude of the magnetic poles)
+ * 不适用于水平磁场强度较弱（磁极纬度30度以内）的操作,因磁极垂直分量占极大部分
 */
 void NavEKF2_core::fuseEulerYaw()
 {
@@ -800,18 +804,23 @@ void NavEKF2_core::fuseEulerYaw()
     float q2 = stateStruct.quat[2];
     float q3 = stateStruct.quat[3];
 
-    // compass measurement error variance (rad^2)
+    // 罗盘测量误差方差--compass measurement error variance (rad^2)
     const float R_YAW = sq(frontend->_yawNoise);
 
     // calculate observation jacobian, predicted yaw and zero yaw body to earth rotation matrix
     // determine if a 321 or 312 Euler sequence is best
+    // 计算观测雅可比矩阵、预测偏航和零偏航机体系到地球系旋转矩阵
+    // 确定321或312欧拉序列是否最佳
     float predicted_yaw;
     float measured_yaw;
     float H_YAW[3];
     Matrix3f Tbn_zeroYaw;
 
+    /*使用在321和312旋转顺序之间切换的Euler偏航航向，以避免出现奇异区域。
+     *使用Euler偏航将观测与横摇和俯仰状态解耦，并通过磁强计融合过程防止磁干扰影响横摇和俯仰。*/
     if (fabsf(prevTnb[0][2]) < fabsf(prevTnb[1][2])) {
         // calculate observation jacobian when we are observing the first rotation in a 321 sequence
+        // 当我们观察321序列中的第一个旋转时，计算观测雅可比矩阵
         float t2 = q0*q0;
         float t3 = q1*q1;
         float t4 = q2*q2;
@@ -840,25 +849,25 @@ void NavEKF2_core::fuseEulerYaw()
         H_YAW[1] = t14*(t15*(q0*q1*2.0f-q2*q3*2.0f)+t9*t10*(q0*q2*2.0f+q1*q3*2.0f));
         H_YAW[2] = t14*(t15*(t2-t3+t4-t5)+t9*t10*(t7-t8));
 
-        // calculate predicted and measured yaw angle
+        // 计算预测和测量的偏航角--calculate predicted and measured yaw angle
         Vector3f euler321;
         stateStruct.quat.to_euler(euler321.x, euler321.y, euler321.z);
-        predicted_yaw = euler321.z;
+        predicted_yaw = euler321.z;//预测偏航
         if (use_compass() && yawAlignComplete && magStateInitComplete) {
-            // Use measured mag components rotated into earth frame to measure yaw
-            Tbn_zeroYaw.from_euler(euler321.x, euler321.y, 0.0f);
-            Vector3f magMeasNED = Tbn_zeroYaw*magDataDelayed.mag;
-            measured_yaw = wrap_PI(-atan2f(magMeasNED.y, magMeasNED.x) + MagDeclination());
+            //使用旋转到导航系的测量mag组件测量偏航-- Use measured mag components rotated into earth frame to measure yaw
+            Tbn_zeroYaw.from_euler(euler321.x, euler321.y, 0.0f);//零偏航旋转矩阵
+            Vector3f magMeasNED = Tbn_zeroYaw*magDataDelayed.mag;//NED系的测量磁场
+            measured_yaw = wrap_PI(-atan2f(magMeasNED.y, magMeasNED.x) + MagDeclination());//这里可知的前面heading正负号问题
         } else if (extNavUsedForYaw) {
-            // Get the yaw angle  from the external vision data
+            //从外部视觉数据获取偏航角-- Get the yaw angle  from the external vision data
             extNavDataDelayed.quat.to_euler(euler321.x, euler321.y, euler321.z);
             measured_yaw =  euler321.z;
         } else {
-            // no data so use predicted to prevent unconstrained variance growth
+            // 没有数据则使用预测的来防止不受约束的方差的增长--no data so use predicted to prevent unconstrained variance growth
             measured_yaw = predicted_yaw;
         }
     } else {
-        // calculate observation jacobian when we are observing a rotation in a 312 sequence
+        //当我们观测312系列中的旋转时，计算观测雅克比矩阵-- calculate observation jacobian when we are observing a rotation in a 312 sequence
         float t2 = q0*q0;
         float t3 = q1*q1;
         float t4 = q2*q2;
@@ -905,13 +914,14 @@ void NavEKF2_core::fuseEulerYaw()
         }
     }
 
-    // Calculate the innovation
+    // 计算偏航残差=预测偏航减去测量偏航--Calculate the innovation
     float innovation = wrap_PI(predicted_yaw - measured_yaw);
 
-    // Copy raw value to output variable used for data logging
+    //将原始值复制到用于数据记录的输出变量-- Copy raw value to output variable used for data logging
     innovYaw = innovation;
 
     // Calculate innovation variance and Kalman gains, taking advantage of the fact that only the first 3 elements in H are non zero
+    // 计算新息方差和卡尔曼增益，利用H中只有前3个元素不为零的事实
     float PH[3];
     float varInnov = R_YAW;
     for (uint8_t rowIndex=0; rowIndex<=2; rowIndex++) {
@@ -919,39 +929,43 @@ void NavEKF2_core::fuseEulerYaw()
         for (uint8_t colIndex=0; colIndex<=2; colIndex++) {
             PH[rowIndex] += P[rowIndex][colIndex]*H_YAW[colIndex];
         }
-        varInnov += H_YAW[rowIndex]*PH[rowIndex];
+        varInnov += H_YAW[rowIndex]*PH[rowIndex];//残差协方差
     }
     float varInnovInv;
     if (varInnov >= R_YAW) {
-        varInnovInv = 1.0f / varInnov;
-        // output numerical health status
+        varInnovInv = 1.0f / varInnov;//计算协方差的倒数
+        // 输出数值健康状态--output numerical health status
         faultStatus.bad_yaw = false;
     } else {
         // the calculation is badly conditioned, so we cannot perform fusion on this step
         // we reset the covariance matrix and try again next measurement
+        // 计算条件很差，因此我们无法在此步骤上执行融合
+        // 我们重置协方差矩阵，然后在下一次测量中重试
         CovarianceInit();
         // output numerical health status
         faultStatus.bad_yaw = true;
         return;
     }
 
-    // calculate Kalman gain
+    // 计算卡尔曼增益--calculate Kalman gain
     for (uint8_t rowIndex=0; rowIndex<=stateIndexLim; rowIndex++) {
         Kfusion[rowIndex] = 0.0f;
         for (uint8_t colIndex=0; colIndex<=2; colIndex++) {
             Kfusion[rowIndex] += P[rowIndex][colIndex]*H_YAW[colIndex];
         }
-        Kfusion[rowIndex] *= varInnovInv;
+        Kfusion[rowIndex] *= varInnovInv;//计算卡尔曼增益K = PH'S^-1
     }
 
-    // calculate the innovation test ratio
+    //计算残差测试比率-- calculate the innovation test ratio
     yawTestRatio = sq(innovation) / (sq(MAX(0.01f * (float)frontend->_yawInnovGate, 1.0f)) * varInnov);
 
-    // Declare the magnetometer unhealthy if the innovation test fails
+    //如果残差测试失败，则宣布磁强计不健康-- Declare the magnetometer unhealthy if the innovation test fails
     if (yawTestRatio > 1.0f) {
         magHealth = false;
         // On the ground a large innovation could be due to large initial gyro bias or magnetic interference from nearby objects
         // If we are flying, then it is more likely due to a magnetometer fault and we should not fuse the data
+        // 在地面上，一个巨大的残差可能是由于附近物体的大初始陀螺仪偏差或磁干扰
+        // 如果我们在飞行，那么很可能是由于磁强计故障，我们不应该融合数据
         if (inFlight) {
             return;
         }
@@ -959,14 +973,14 @@ void NavEKF2_core::fuseEulerYaw()
         magHealth = true;
     }
 
-    // limit the innovation so that initial corrections are not too large
+    //限制残差，使初始修正不会太大-- limit the innovation so that initial corrections are not too large
     if (innovation > 0.5f) {
         innovation = 0.5f;
     } else if (innovation < -0.5f) {
         innovation = -0.5f;
     }
 
-    // correct the covariance using P = P - K*H*P taking advantage of the fact that only the first 3 elements in H are non zero
+    // 计算协方差correct the covariance using P = P - K*H*P taking advantage of the fact that only the first 3 elements in H are non zero
     // calculate K*H*P
     for (uint8_t row = 0; row <= stateIndexLim; row++) {
         for (uint8_t column = 0; column <= 2; column++) {
@@ -982,7 +996,7 @@ void NavEKF2_core::fuseEulerYaw()
         }
     }
 
-    // Check that we are not going to drive any variances negative and skip the update if so
+    //检查我们不会导致任何方差为负值，如果是，则跳过更新-- Check that we are not going to drive any variances negative and skip the update if so
     bool healthyFusion = true;
     for (uint8_t i= 0; i<=stateIndexLim; i++) {
         if (KHP[i][i] > P[i][i]) {
@@ -990,37 +1004,39 @@ void NavEKF2_core::fuseEulerYaw()
         }
     }
     if (healthyFusion) {
-        // update the covariance matrix
+        // 更新协方差矩阵---update the covariance matrix
         for (uint8_t i= 0; i<=stateIndexLim; i++) {
             for (uint8_t j= 0; j<=stateIndexLim; j++) {
-                P[i][j] = P[i][j] - KHP[i][j];
+                P[i][j] = P[i][j] - KHP[i][j];//计算后验协方差
             }
         }
 
-        // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+        //强制协方差矩阵对称并限制方差以防止病态-- force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
         ForceSymmetry();
         ConstrainVariances();
 
         // zero the attitude error state - by definition it is assumed to be zero before each observation fusion
+        // 将姿态误差状态归零-根据定义，在每次观测融合之前，假设姿态误差状态为0
         stateStruct.angErr.zero();
 
-        // correct the state vector
+        // 修正状态向量---correct the state vector
         for (uint8_t i=0; i<=stateIndexLim; i++) {
             statesArray[i] -= Kfusion[i] * innovation;
         }
 
         // the first 3 states represent the angular misalignment vector. This is
         // is used to correct the estimated quaternion on the current time step
+        // 前3个状态表示角度偏差向量。这是用于更正当前时间步长上估计的四元数
         stateStruct.quat.rotate(stateStruct.angErr);
 
-        // record fusion event
+        // 记录融合事件record fusion event
         faultStatus.bad_yaw = false;
         lastYawTime_ms = imuSampleTime_ms;
 
 
     } else {
         // record fusion numerical health status
-        faultStatus.bad_yaw = true;
+        faultStatus.bad_yaw = true;//记录融合数值健康状态
     }
 }
 
@@ -1157,17 +1173,18 @@ void NavEKF2_core::FuseDeclination(float declErr)
 ********************************************************/
 
 // align the NE earth magnetic field states with the published declination
+// 用发布的磁偏角来对齐北东磁场状态
 void NavEKF2_core::alignMagStateDeclination()
 {
-    // don't do this if we already have a learned magnetic field
+    // 如果我们已经学习磁场不要做--don't do this if we already have a learned magnetic field
     if (magFieldLearned) {
         return;
     }
 
-    // get the magnetic declination
+    // 获取磁偏角--get the magnetic declination
     float magDecAng = MagDeclination();
 
-    // rotate the NE values so that the declination matches the published value
+    // 旋转北东向的值，使得磁偏角与发布的值匹配--rotate the NE values so that the declination matches the published value
     Vector3f initMagNED = stateStruct.earth_magfield;
     float magLengthNE = norm(initMagNED.x,initMagNED.y);
     stateStruct.earth_magfield.x = magLengthNE * cosf(magDecAng);
@@ -1182,7 +1199,7 @@ void NavEKF2_core::alignMagStateDeclination()
         P[16][16] = var_16;
         P[17][17] = var_17;
 
-        // fuse the declination angle to establish covariances and prevent large swings in declination
+        // 融合磁偏角建立协方差和防止在初始融合期间磁倾的大波动---fuse the declination angle to establish covariances and prevent large swings in declination
         // during initial fusion
         FuseDeclination(0.1f);
 

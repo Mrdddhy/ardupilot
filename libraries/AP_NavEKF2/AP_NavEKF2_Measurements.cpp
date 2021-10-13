@@ -957,12 +957,14 @@ void NavEKF2_core::writeExtNavData(const Vector3f &sensOffset, const Vector3f &p
 
 /*
   return declination in radians
+  以弧度的形式返回磁偏角
 */
 float NavEKF2_core::MagDeclination(void) const
 {
     // if we are using the WMM tables then use the table declination
     // to ensure consistency with the table mag field. Otherwise use
     // the declination from the compass library
+    /*如果我们使用WMM表，那么使用表的磁偏角来确保与磁场表的一致性，否则使用罗盘库中的磁偏角*/
     if (have_table_earth_field && frontend->_mag_ef_limit > 0) {
         return table_declination;
     }
