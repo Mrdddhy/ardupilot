@@ -791,7 +791,7 @@ private:
     bool velHealth;                 // boolean true if velocity measurements have passed innovation consistency check
     bool posHealth;                 // boolean true if position measurements have passed innovation consistency check
     bool hgtHealth;                 // boolean true if height measurements have passed innovation consistency check
-    bool magHealth;                 // boolean true if magnetometer has passed innovation consistency check
+    bool magHealth;                 // 如果磁力计已通过残差一致性检查，则布尔值为真--boolean true if magnetometer has passed innovation consistency check
     bool tasHealth;                 // boolean true if true airspeed has passed innovation consistency check
     bool velTimeout;                // boolean true if velocity measurements have failed innovation consistency check and timed out
     bool posTimeout;                // boolean true if position measurements have failed innovation consistency check and timed out
@@ -908,7 +908,7 @@ private:
     uint8_t gpsStoreIndex;          // GPS data storage index
     output_elements outputDataNew;  // output state data at the current time step
     output_elements outputDataDelayed; // output state data at the current time step
-    Vector3f delAngCorrection;      // correction applied to delta angles used by output observer to track the EKF
+    Vector3f delAngCorrection;      // 对输出观测器用于跟踪EKF的增量角进行校正--correction applied to delta angles used by output observer to track the EKF
     Vector3f velErrintegral;        // integral of output predictor NED velocity tracking error (m)
     Vector3f posErrintegral;        // integral of output predictor NED position tracking error (m.sec)
     float innovYaw;                 // compass yaw angle innovation (rad)
@@ -1021,7 +1021,7 @@ private:
                      AID_NONE=1,       // no aiding is being used so only attitude and height estimates are available. Either constVelMode or constPosMode must be used to constrain tilt drift.
                      AID_RELATIVE=2    // only optical flow aiding is being used so position estimates will be relative
                     };
-    AidingMode PV_AidingMode;       // Defines the preferred mode for aiding of velocity and position estimates from the INS
+    AidingMode PV_AidingMode;       //定义用于辅助INS速度和位置估计的首选模式-- Defines the preferred mode for aiding of velocity and position estimates from the INS
     AidingMode PV_AidingModePrev;   // Value of PV_AidingMode from the previous frame - used to detect transitions
     bool gpsInhibit;                // externally set flag informing the EKF not to use the GPS
     bool gndOffsetValid;            // true when the ground offset state can still be considered valid
@@ -1163,6 +1163,8 @@ private:
     // states held by magnetomter fusion across time steps
     // magnetometer X,Y,Z measurements are fused across three time steps
     // to level computational load as this is an expensive operation
+    /*跨时间步磁融合所保持的状态，磁力计的X、Y、Z测量通过三个时间步进行融合，
+      以平衡计算负载，因为这是一项昂贵的操作*/
     struct {
         ftype q0;
         ftype q1;

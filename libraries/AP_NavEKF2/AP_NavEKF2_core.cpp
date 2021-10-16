@@ -71,6 +71,9 @@ bool NavEKF2_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
       maximum fusion rate of 100Hz. Non-imu data coming in at faster
       than 100Hz is downsampled. For 50Hz main loop rate we need a
       shorter buffer.
+      imu缓冲区长度需要以100Hz的最大融合速率处理260ms的延迟。
+      以超过100Hz的速度输入的非imu数据将进行下采样。
+      对于50Hz的主环路速率，我们需要一个较短的缓冲区。
      */
     if (AP::ins().get_sample_rate() < 100) {
         imu_buffer_length = 13;
@@ -777,11 +780,14 @@ void NavEKF2_core::UpdateStrapdownEquationsNED()
 /*
  * Propagate PVA solution forward from the fusion time horizon to the current time horizon
  * using simple observer which performs two functions:
- * 1) Corrects for the delayed time horizon used by the EKF.
- * 2) Applies a LPF to state corrections to prevent 'stepping' in states due to measurement
+ * 使用执行两个功能的简单观测器将PVA解从融合时间范围向前传播到当前时间范围：
+ * 1) 修正EKF使用的延迟时间范围----Corrects for the delayed time horizon used by the EKF.
+ * 2) 将LPF应用于状态校正，以防止由于测量融合将不必要的噪声引入控制回路而导致的状态“步进”--
+ * Applies a LPF to state corrections to prevent 'stepping' in states due to measurement
  * fusion introducing unwanted noise into the control loops.
  * The inspiration for using a complementary filter to correct for time delays in the EKF
  * is based on the work by A Khosravian.
+ * 使用互补滤波器校正EKF中的时间延迟的灵感来源于Khosrian的工作
  *
  * "Recursive Attitude Estimation in the Presence of Multi-rate and Multi-delay Vector Measurements"
  * A Khosravian, J Trumpf, R Mahony, T Hamel, Australian National University
@@ -794,7 +800,7 @@ void NavEKF2_core::calcOutputStates()
     correctDeltaAngle(delAngNewCorrected, imuDataNew.delAngDT, imuDataNew.gyro_index);//校正增量角度
     correctDeltaVelocity(delVelNewCorrected, imuDataNew.delVelDT, imuDataNew.accel_index);//校正增量速度
 
-    // apply corections to track EKF solution
+    // 将修正应用于跟踪EKF解---apply corrections to track EKF solution
     Vector3f delAng = delAngNewCorrected + delAngCorrection;
 
     //将获取的四元数进行归一化-- convert the rotation vector to its equivalent quaternion
@@ -827,19 +833,19 @@ void NavEKF2_core::calcOutputStates()
     // Optimizing the Gains of the Baro-Inertial Vertical Channel
     // Widnall W.S, Sinha P.K,
     // AIAA Journal of Guidance and Control, 78-1307R
-   
+    // 使用三阶互补滤波器估计垂直位置输出的变化率
     // Perform filter calculation using backwards Euler integration
     // Coefficients selected to place all three filter poles at omega
-    // 使用选定的反向欧拉积分系数进行滤波计算，将所有三个极点置于omega
-    const float CompFiltOmega = M_2PI * constrain_float(frontend->_hrt_filt_freq, 0.1f, 30.0f);
+    // 使用选定的后向欧拉积分系数进行滤波计算，将所有三个极点置于omega
+    const float CompFiltOmega = M_2PI * constrain_float(frontend->_hrt_filt_freq, 0.1f, 30.0f);//w
     float omega2 = CompFiltOmega * CompFiltOmega;
-    float pos_err = outputDataNew.position.z - vertCompFiltState.pos;
+    float pos_err = outputDataNew.position.z - vertCompFiltState.pos;//Z轴位置误差
     float integ1_input = pos_err * omega2 * CompFiltOmega * imuDataNew.delVelDT;
-    vertCompFiltState.acc += integ1_input;
+    vertCompFiltState.acc += integ1_input;  //加速度
     float integ2_input = delVelNav.z + (vertCompFiltState.acc + pos_err * omega2 * 3.0f) * imuDataNew.delVelDT;
-    vertCompFiltState.vel += integ2_input;
+    vertCompFiltState.vel += integ2_input;  //速度
     float integ3_input = (vertCompFiltState.vel + pos_err * CompFiltOmega * 3.0f) * imuDataNew.delVelDT;
-    vertCompFiltState.pos += integ3_input; 
+    vertCompFiltState.pos += integ3_input;  //位置
 
     // 对速度应用梯形积分来计算位置-- apply a trapezoidal integration to velocities to calculate position
     outputDataNew.position += (outputDataNew.velocity + lastVelocity) * (imuDataNew.delVelDT*0.5f);
@@ -852,14 +858,18 @@ void NavEKF2_core::calcOutputStates()
     if (!accelPosOffset.is_zero()) {
         // calculate the average angular rate across the last IMU update
         // note delAngDT is prevented from being zero in readIMUData()
+        // 计算最后一次IMU更新期间的平均角速率
+        // 注意：readIMUData()中的delAngDT不能为零
         Vector3f angRate = imuDataNew.delAng * (1.0f/imuDataNew.delAngDT);
 
         // Calculate the velocity of the body frame origin relative to the IMU in body frame
         // and rotate into earth frame. Note % operator has been overloaded to perform a cross product
-        Vector3f velBodyRelIMU = angRate % (- accelPosOffset);
+        // 计算主体框架原点相对于主体框架中IMU的速度，并旋转到地球框架中
+        Vector3f velBodyRelIMU = angRate % (- accelPosOffset);//叉积
         velOffsetNED = Tbn_temp * velBodyRelIMU;
 
         // calculate the earth frame position of the body frame origin relative to the IMU
+        // 计算车身框架原点相对于IMU的地球系位置
         posOffsetNED = Tbn_temp * (- accelPosOffset);
     } else {
         velOffsetNED.zero();
@@ -872,16 +882,18 @@ void NavEKF2_core::calcOutputStates()
         // 在输出时间范围内存储状态---store the states at the output time horizon
         storedOutput[storedIMU.get_youngest_index()] = outputDataNew;
 
-        // recall the states from the fusion time horizon
+        // 重新获得融合时间范围内的状态---recall the states from the fusion time horizon
         outputDataDelayed = storedOutput[storedIMU.get_oldest_index()];
 
         // compare quaternion data with EKF quaternion at the fusion time horizon and calculate correction
-
+        // 在融合时间范围内比较四元数数据与EKF四元数，并计算校正
         // divide the demanded quaternion by the estimated to get the error
+        // 将所需的四元数除以估计值，得到误差
         Quaternion quatErr = stateStruct.quat / outputDataDelayed.quat;
 
         // Convert to a delta rotation using a small angle approximation
-        quatErr.normalize();
+        // 使用小角度近似值转换为增量旋转
+        quatErr.normalize();//误差四元数单位化
         Vector3f deltaAngErr;
         float scaler;
         if (quatErr[0] >= 0.0f) {
@@ -889,38 +901,45 @@ void NavEKF2_core::calcOutputStates()
         } else {
             scaler = -2.0f;
         }
-        deltaAngErr.x = scaler * quatErr[1];
+        deltaAngErr.x = scaler * quatErr[1];//把误差四元数转化回增量角度矢量
         deltaAngErr.y = scaler * quatErr[2];
         deltaAngErr.z = scaler * quatErr[3];
 
         // calculate a gain that provides tight tracking of the estimator states and
         // adjust for changes in time delay to maintain consistent damping ratio of ~0.7
+        // 计算一个能紧密跟踪估计器状态的增益，并调整时间延迟的变化，以保持~0.7的一致阻尼比
         float timeDelay = 1e-3f * (float)(imuDataNew.time_ms - imuDataDelayed.time_ms);
         timeDelay = fmaxf(timeDelay, dtIMUavg);
         float errorGain = 0.5f / timeDelay;
 
         // calculate a corrrection to the delta angle
         // that will cause the INS to track the EKF quaternions
+        // 计算增量角修正，这会引起INS跟踪EKF四元数的增量角的修正
         delAngCorrection = deltaAngErr * errorGain * dtIMUavg;
 
         // calculate velocity and position tracking errors
+        // 计算速度和位置跟踪误差
         Vector3f velErr = (stateStruct.velocity - outputDataDelayed.velocity);
         Vector3f posErr = (stateStruct.position - outputDataDelayed.position);
 
         // collect magnitude tracking error for diagnostics
+        // 收集幅值跟踪误差以进行诊断
         outputTrackError.x = deltaAngErr.length();
         outputTrackError.y = velErr.length();
         outputTrackError.z = posErr.length();
 
         // convert user specified time constant from centi-seconds to seconds
+        // 将用户指定的时间常数从厘米秒转换为秒
         float tauPosVel = constrain_float(0.01f*(float)frontend->_tauVelPosOutput, 0.1f, 0.5f);
 
         // calculate a gain to track the EKF position states with the specified time constant
+        // 计算增益以跟踪具有指定时间常数的EKF位置状态
         float velPosGain = dtEkfAvg / constrain_float(tauPosVel, dtEkfAvg, 10.0f);
 
         // use a PI feedback to calculate a correction that will be applied to the output state history
-        posErrintegral += posErr;
-        velErrintegral += velErr;
+        // 使用PI反馈计算将应用于输出状态历史的校正
+        posErrintegral += posErr;//位置误差积分
+        velErrintegral += velErr;//速度误差积分
         Vector3f velCorrection = velErr * velPosGain + velErrintegral * sq(velPosGain) * 0.1f;
         Vector3f posCorrection = posErr * velPosGain + posErrintegral * sq(velPosGain) * 0.1f;
 
@@ -928,6 +947,8 @@ void NavEKF2_core::calcOutputStates()
         // this method is too expensive to use for the attitude states due to the quaternion operations required
         // but does not introduce a time delay in the 'correction loop' and allows smaller tracking time constants
         // to be used
+        /*通过输出滤波器状态历史进行循环，并对速度和位置状态进行校正。由于需要四元数操作，
+          此方法对于姿态状态使用成本太高，但不会在“校正循环”中引入时间延迟，并允许使用较小的跟踪时间常数*/
         output_elements outputStates;
         for (unsigned index=0; index < imu_buffer_length; index++) {
             outputStates = storedOutput[index];

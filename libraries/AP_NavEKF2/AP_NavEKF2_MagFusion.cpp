@@ -278,17 +278,19 @@ void NavEKF2_core::SelectMagFusion()
     bool dataReady = (magDataToFuse && statesInitialised && use_compass() && yawAlignComplete);//数据就绪标志位
     if (dataReady) {
         // use the simple method of declination to maintain heading if we cannot use the magnetic field states
-        /*如果不能利用磁场状态，就用简单的磁偏角法来保持航向*/
+        /*如果不能利用磁场状态，就用简单的磁偏角法来保持航向
+          如果磁场协方差保持不变 或 需要磁场重置 或 磁场状态初始化未完成 -> 执行真航向更新
+        */
         if(inhibitMagStates || magStateResetRequest || !magStateInitComplete) {
-            fuseEulerYaw();//对偏航角修正
+            fuseEulerYaw();//真航向更新
             // zero the test ratio output from the inactive 3-axis magnetometer fusion
-            /*将非活动的三轴磁强计融合输出的测试比调零*/
-            magTestRatio.zero();
+            /*将非活动的三轴磁力计融合输出的测试比调零*/
+            magTestRatio.zero();//这个是啥？
         } else {
             // if we are not doing aiding with earth relative observations (eg GPS) then the declination is
             // maintained by fusing declination as a synthesised observation
             // We also fuse declination if we are using the WMM tables
-            /*如果我们没有借助地球相对观测(如GPS)，那么磁偏角就是通过次磁偏角作为综合观测来维持的，
+            /*如果我们没有借助地球相对观测(如GPS)，那么磁偏角就是通过融合磁偏角作为合成观测来维持的，
               如果我们使用WMM表，我们也会融合磁偏角
             */
             if (PV_AidingMode != AID_ABSOLUTE ||
@@ -296,10 +298,10 @@ void NavEKF2_core::SelectMagFusion()
                 FuseDeclination(0.34f);
             }
             // fuse the three magnetometer componenents sequentially
-            /*依次融合磁强计三个分量*/
+            /*依次融合磁力计三个分量*/
             for (mag_state.obsIndex = 0; mag_state.obsIndex <= 2; mag_state.obsIndex++) {
                 hal.util->perf_begin(_perf_test[0]);
-                FuseMagnetometer();//融合磁力计
+                FuseMagnetometer();//融合磁力计--无磁偏角约束
                 hal.util->perf_end(_perf_test[0]);
                 // don't continue fusion if unhealthy
                 /*如果不健康，就不要继续融合*/
@@ -384,7 +386,11 @@ void NavEKF2_core::FuseMagnetometer()
     // data fit is the only assumption we can make
     // so we might as well take advantage of the computational efficiencies
     // associated with sequential fusion
-    // calculate observation jacobians and Kalman gains
+    /*执行磁力计测量的顺序融合。这假设不同分量中的误差是不相关的，这是不正确的
+      但是在没有协方差的情况下,数据拟合是我们可以做的唯一假设。
+      因此，我们不妨利用与顺序融合相关的计算效率*/
+
+    // 计算观测雅可比和卡尔曼增益--calculate observation jacobians and Kalman gains
     if (obsIndex == 0)
     {
 
@@ -395,15 +401,16 @@ void NavEKF2_core::FuseMagnetometer()
         q1       = stateStruct.quat[1];
         q2       = stateStruct.quat[2];
         q3       = stateStruct.quat[3];
-        magN     = stateStruct.earth_magfield[0];
+        magN     = stateStruct.earth_magfield[0];//导航系地磁场状态
         magE     = stateStruct.earth_magfield[1];
         magD     = stateStruct.earth_magfield[2];
-        magXbias = stateStruct.body_magfield[0];
+        magXbias = stateStruct.body_magfield[0]; //机体系磁场偏差状态
         magYbias = stateStruct.body_magfield[1];
         magZbias = stateStruct.body_magfield[2];
 
         // rotate predicted earth components into body axes and calculate
         // predicted measurements
+        // 旋转预测的地磁分量到机体系轴上和计算预测测量
         DCM[0][0] = q0*q0 + q1*q1 - q2*q2 - q3*q3;
         DCM[0][1] = 2.0f*(q1*q2 + q0*q3);
         DCM[0][2] = 2.0f*(q1*q3-q0*q2);
@@ -413,19 +420,22 @@ void NavEKF2_core::FuseMagnetometer()
         DCM[2][0] = 2.0f*(q1*q3 + q0*q2);
         DCM[2][1] = 2.0f*(q2*q3 - q0*q1);
         DCM[2][2] = q0*q0 - q1*q1 - q2*q2 + q3*q3;
-        MagPred[0] = DCM[0][0]*magN + DCM[0][1]*magE  + DCM[0][2]*magD + magXbias;
+        MagPred[0] = DCM[0][0]*magN + DCM[0][1]*magE  + DCM[0][2]*magD + magXbias;//机体系轴上的三轴磁场预测值
         MagPred[1] = DCM[1][0]*magN + DCM[1][1]*magE  + DCM[1][2]*magD + magYbias;
         MagPred[2] = DCM[2][0]*magN + DCM[2][1]*magE  + DCM[2][2]*magD + magZbias;
 
         // calculate the measurement innovation for each axis
+        // 计算每个轴的测量残差 = 预测值 - 测量值
         for (uint8_t i = 0; i<=2; i++) {
             innovMag[i] = MagPred[i] - magDataDelayed.mag[i];
         }
 
         // scale magnetometer observation error with total angular rate to allow for timing errors
+        // 用总角速率误差来标度磁力计观测误差以允许定时误差?
         R_MAG = sq(constrain_float(frontend->_magNoise, 0.01f, 0.5f)) + sq(frontend->magVarRateScale*delAngCorrected.length() / imuDataDelayed.delAngDT);
 
         // calculate common expressions used to calculate observation jacobians an innovation variance for each component
+        // 计算常用表达式,用于计算观测雅可比矩阵和每个分量的残差方差
         SH_MAG[0] = sq(q0) - sq(q1) + sq(q2) - sq(q3);
         SH_MAG[1] = sq(q0) + sq(q1) - sq(q2) - sq(q3);
         SH_MAG[2] = sq(q0) - sq(q1) - sq(q2) + sq(q3);
@@ -436,14 +446,17 @@ void NavEKF2_core::FuseMagnetometer()
         SH_MAG[7] = 2.0f*q1*q3 - 2.0f*q0*q2;
         SH_MAG[8] = 2.0f*q0*q3;
 
-        // Calculate the innovation variance for each axis
+        /*最初的设计意图是要求所有轴都通过，因为严重错误很少限制在单个轴上。这在以前的实施中没有实现。
+         在融合任何轴之前，这些更改将所有三个轴的残差一致性检查移至顶部。已删除不必要的性能计时器。*/
+        
+        //计算每个轴的残差方差-- Calculate the innovation variance for each axis
         // X axis
         varInnovMag[0] = (P[19][19] + R_MAG - P[1][19]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][19]*SH_MAG[1] + P[17][19]*SH_MAG[4] + P[18][19]*SH_MAG[7] + P[2][19]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2)) - (magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5])*(P[19][1] - P[1][1]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][1]*SH_MAG[1] + P[17][1]*SH_MAG[4] + P[18][1]*SH_MAG[7] + P[2][1]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))) + SH_MAG[1]*(P[19][16] - P[1][16]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][16]*SH_MAG[1] + P[17][16]*SH_MAG[4] + P[18][16]*SH_MAG[7] + P[2][16]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))) + SH_MAG[4]*(P[19][17] - P[1][17]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][17]*SH_MAG[1] + P[17][17]*SH_MAG[4] + P[18][17]*SH_MAG[7] + P[2][17]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))) + SH_MAG[7]*(P[19][18] - P[1][18]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][18]*SH_MAG[1] + P[17][18]*SH_MAG[4] + P[18][18]*SH_MAG[7] + P[2][18]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))) + (magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))*(P[19][2] - P[1][2]*(magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5]) + P[16][2]*SH_MAG[1] + P[17][2]*SH_MAG[4] + P[18][2]*SH_MAG[7] + P[2][2]*(magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2))));
         if (varInnovMag[0] >= R_MAG) {
             faultStatus.bad_xmag = false;
         } else {
-            // the calculation is badly conditioned, so we cannot perform fusion on this step
-            // we reset the covariance matrix and try again next measurement
+            //计算条件很差，因此我们无法在此步骤上执行融合-- the calculation is badly conditioned, so we cannot perform fusion on this step
+            //我们重置协方差矩阵，然后在下一次测量中重试-- we reset the covariance matrix and try again next measurement
             CovarianceInit();
             obsIndex = 1;
             faultStatus.bad_xmag = true;
@@ -485,21 +498,22 @@ void NavEKF2_core::FuseMagnetometer()
             return;
         }
 
-        // calculate the innovation test ratios
+        // 计算残差测试比率--calculate the innovation test ratios
         for (uint8_t i = 0; i<=2; i++) {
             magTestRatio[i] = sq(innovMag[i]) / (sq(MAX(0.01f * (float)frontend->_magInnovGate, 1.0f)) * varInnovMag[i]);
         }
 
-        // check the last values from all components and set magnetometer health accordingly
+        //检查所有组件的最后值，并相应地设置磁力计的健康运行状况-- check the last values from all components and set magnetometer health accordingly
         magHealth = (magTestRatio[0] < 1.0f && magTestRatio[1] < 1.0f && magTestRatio[2] < 1.0f);
 
-        // if the magnetometer is unhealthy, do not proceed further
+        //如果磁力计不正常，请勿继续操作-- if the magnetometer is unhealthy, do not proceed further
         if (!magHealth) {
             hal.util->perf_end(_perf_test[2]);
             return;
         }
 
-        for (uint8_t i = 0; i<=stateIndexLim; i++) H_MAG[i] = 0.0f;
+        for (uint8_t i = 0; i<=stateIndexLim; i++) H_MAG[i] = 0.0f;//观测矩阵
+
         H_MAG[1] = SH_MAG[6] - magD*SH_MAG[2] - magN*SH_MAG[5];
         H_MAG[2] = magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2);
         H_MAG[16] = SH_MAG[1];
@@ -508,10 +522,13 @@ void NavEKF2_core::FuseMagnetometer()
         H_MAG[19] = 1.0f;
 
         // calculate Kalman gain
+        // 残差协方差倒数
         SK_MX[0] = 1.0f / varInnovMag[0];
         SK_MX[1] = magE*SH_MAG[0] + magD*SH_MAG[3] - magN*(SH_MAG[8] - 2.0f*q1*q2);
         SK_MX[2] = magD*SH_MAG[2] - SH_MAG[6] + magN*SH_MAG[5];
         SK_MX[3] = SH_MAG[7];
+
+        //卡尔曼增益
         Kfusion[0] = SK_MX[0]*(P[0][19] + P[0][16]*SH_MAG[1] + P[0][17]*SH_MAG[4] - P[0][1]*SK_MX[2] + P[0][2]*SK_MX[1] + P[0][18]*SK_MX[3]);
         Kfusion[1] = SK_MX[0]*(P[1][19] + P[1][16]*SH_MAG[1] + P[1][17]*SH_MAG[4] - P[1][1]*SK_MX[2] + P[1][2]*SK_MX[1] + P[1][18]*SK_MX[3]);
         Kfusion[2] = SK_MX[0]*(P[2][19] + P[2][16]*SH_MAG[1] + P[2][17]*SH_MAG[4] - P[2][1]*SK_MX[2] + P[2][2]*SK_MX[1] + P[2][18]*SK_MX[3]);
@@ -530,7 +547,7 @@ void NavEKF2_core::FuseMagnetometer()
         Kfusion[15] = SK_MX[0]*(P[15][19] + P[15][16]*SH_MAG[1] + P[15][17]*SH_MAG[4] - P[15][1]*SK_MX[2] + P[15][2]*SK_MX[1] + P[15][18]*SK_MX[3]);
         // end perf block
 
-        // zero Kalman gains to inhibit wind state estimation
+        // 零卡尔曼增益抑制风状态估计--zero Kalman gains to inhibit wind state estimation
         if (!inhibitWindStates) {
             Kfusion[22] = SK_MX[0]*(P[22][19] + P[22][16]*SH_MAG[1] + P[22][17]*SH_MAG[4] - P[22][1]*SK_MX[2] + P[22][2]*SK_MX[1] + P[22][18]*SK_MX[3]);
             Kfusion[23] = SK_MX[0]*(P[23][19] + P[23][16]*SH_MAG[1] + P[23][17]*SH_MAG[4] - P[23][1]*SK_MX[2] + P[23][2]*SK_MX[1] + P[23][18]*SK_MX[3]);
@@ -538,7 +555,7 @@ void NavEKF2_core::FuseMagnetometer()
             Kfusion[22] = 0.0f;
             Kfusion[23] = 0.0f;
         }
-        // zero Kalman gains to inhibit magnetic field state estimation
+        //零卡尔曼增益抑制磁场状态估计-- zero Kalman gains to inhibit magnetic field state estimation
         if (!inhibitMagStates) {
             Kfusion[16] = SK_MX[0]*(P[16][19] + P[16][16]*SH_MAG[1] + P[16][17]*SH_MAG[4] - P[16][1]*SK_MX[2] + P[16][2]*SK_MX[1] + P[16][18]*SK_MX[3]);
             Kfusion[17] = SK_MX[0]*(P[17][19] + P[17][16]*SH_MAG[1] + P[17][17]*SH_MAG[4] - P[17][1]*SK_MX[2] + P[17][2]*SK_MX[1] + P[17][18]*SK_MX[3]);
@@ -552,11 +569,13 @@ void NavEKF2_core::FuseMagnetometer()
             }
         }
 
-        // reset the observation index to 0 (we start by fusing the X measurement)
+        //将观察指数重置为0（我们从融合X测量开始)-- reset the observation index to 0 (we start by fusing the X measurement)
         obsIndex = 0;
 
         // set flags to indicate to other processes that fusion has been performed and is required on the next frame
         // this can be used by other fusion processes to avoid fusing on the same frame as this expensive step
+        // 设置标志，以向其他进程指示已执行融合，并且需要在下一帧进行融合
+        //这可由其他融合过程使用，以避免与此昂贵步骤在同一帧上融合
         magFusePerformed = true;
         magFuseRequired = true;
 
@@ -696,7 +715,7 @@ void NavEKF2_core::FuseMagnetometer()
 
     hal.util->perf_begin(_perf_test[5]);
 
-    // correct the covariance P = (I - K*H)*P
+    // 修正协方差---correct the covariance P = (I - K*H)*P
     // take advantage of the empty columns in KH to reduce the
     // number of operations
     for (unsigned i = 0; i<=stateIndexLim; i++) {
@@ -729,6 +748,7 @@ void NavEKF2_core::FuseMagnetometer()
         }
     }
     // Check that we are not going to drive any variances negative and skip the update if so
+    // 检查我们不会导致任何方差为负值，如果是，则跳过更新
     bool healthyFusion = true;
     for (uint8_t i= 0; i<=stateIndexLim; i++) {
         if (KHP[i][i] > P[i][i]) {
@@ -736,37 +756,38 @@ void NavEKF2_core::FuseMagnetometer()
         }
     }
     if (healthyFusion) {
-        // update the covariance matrix
+        // 更新协方差矩阵--update the covariance matrix
         for (uint8_t i= 0; i<=stateIndexLim; i++) {
             for (uint8_t j= 0; j<=stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
             }
         }
 
-        // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+        // 强制协方差矩阵对称并限制方差以防止病态--force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
         ForceSymmetry();
         ConstrainVariances();
 
-        // update the states
+        // 更新状态--update the states
         // zero the attitude error state - by definition it is assumed to be zero before each observation fusion
+        // 将姿态误差状态归零-根据定义，在每次观测融合之前，假设姿态误差状态为零
         stateStruct.angErr.zero();
 
-        // correct the state vector
+        // 修正状态---correct the state vector
         for (uint8_t j= 0; j<=stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovMag[obsIndex];
         }
 
-        // add table constraint here for faster convergence
+        // 在此处添加表约束以加快收敛速度--add table constraint here for faster convergence
         if (have_table_earth_field && frontend->_mag_ef_limit > 0) {
             MagTableConstrain();
         }
 
         // the first 3 states represent the angular misalignment vector. This is
         // is used to correct the estimated quaternion on the current time step
-        stateStruct.quat.rotate(stateStruct.angErr);
+        stateStruct.quat.rotate(stateStruct.angErr);//更新四元数
 
     } else {
-        // record bad axis
+        // 记录坏的轴--record bad axis
         if (obsIndex == 0) {
             faultStatus.bad_xmag = true;
         } else if (obsIndex == 1) {
@@ -1046,22 +1067,24 @@ void NavEKF2_core::fuseEulerYaw()
  * https://github.com/priseborough/InertialNav/blob/master/derivations/RotationVectorAttitudeParameterisation/GenerateNavFilterEquations.m
  * This is used to prevent the declination of the EKF earth field states from drifting during operation without GPS
  * or some other absolute position or velocity reference
+ * 这用于防止在没有GPS或其他绝对位置或速度参考的情况下运行期间EKF地磁场状态的磁偏角漂移--磁偏角的第三个数据源
+ * 传入参数declErr：磁偏角误差标准差数值
 */
 void NavEKF2_core::FuseDeclination(float declErr)
 {
-    // declination error variance (rad^2)
+    //磁偏角误差方差-- declination error variance (rad^2)
     const float R_DECL = sq(declErr);
 
-    // copy required states to local variables
+    //将所需变量复制到局部变量-- copy required states to local variables
     float magN = stateStruct.earth_magfield.x;
-    float magE = stateStruct.earth_magfield.y;
+    float magE = stateStruct.earth_magfield.y;//用于获取磁偏角预测值
 
-    // prevent bad earth field states from causing numerical errors or exceptions
+    //防止不良地磁场状态导致数值错误或异常-- prevent bad earth field states from causing numerical errors or exceptions
     if (magN < 1e-3f) {
         return;
     }
 
-    // Calculate observation Jacobian and Kalman gains
+    //计算观测矩阵和卡尔曼增益-- Calculate observation Jacobian and Kalman gains
     float t2 = magE*magE;
     float t3 = magN*magN;
     float t4 = t2+t3;
@@ -1076,17 +1099,18 @@ void NavEKF2_core::FuseDeclination(float declErr)
     float t14 = P[17][17]*t23;
     float t10 = t9-t14;
     float t15 = t23*t10;
-    float t11 = R_DECL+t8-t15; // innovation variance
+    float t11 = R_DECL+t8-t15; //残差方差-- innovation variance
     if (t11 < R_DECL) {
         return;
     }
-    float t12 = 1.0f/t11;
+    float t12 = 1.0f/t11;//残差协方差
 
-    float H_MAG[24];
+    float H_MAG[24];//观测矩阵
 
-    H_MAG[16] = -magE*t5;
+    H_MAG[16] = -magE*t5;//只有这两项有数值
     H_MAG[17] = magN*t5;
 
+    //卡尔曼增益
     for (uint8_t i=0; i<=15; i++) {
         Kfusion[i] = -t12*(P[i][16]*t22-P[i][17]*t23);
     }
@@ -1096,22 +1120,23 @@ void NavEKF2_core::FuseDeclination(float declErr)
         Kfusion[i] = -t12*(P[i][16]*t22-P[i][17]*t23);
     }
 
-    // get the magnetic declination
+    //获取地磁磁场-- get the magnetic declination
     float magDecAng = MagDeclination();
 
-    // Calculate the innovation
+    //计算磁偏角残差=预测值-测量值-- Calculate the innovationinnovation
     float innovation = atan2f(magE , magN) - magDecAng;
 
-    // limit the innovation to protect against data errors
+    //约束残差防止数据错误 limit the innovation to protect against data errors
     if (innovation > 0.5f) {
         innovation = 0.5f;
     } else if (innovation < -0.5f) {
         innovation = -0.5f;
     }
 
-    // correct the covariance P = (I - K*H)*P
+    // correct the covariance P = (I - K*H)*P 
     // take advantage of the empty columns in KH to reduce the
     // number of operations
+    //  P = (I - K*H)*P = P -KHP
     for (unsigned i = 0; i<=stateIndexLim; i++) {
         for (unsigned j = 0; j<=15; j++) {
             KH[i][j] = 0.0f;
@@ -1129,15 +1154,16 @@ void NavEKF2_core::FuseDeclination(float declErr)
     }
 
     // Check that we are not going to drive any variances negative and skip the update if so
+    // 检查我们不会导致任何方差为负值，如果是，则跳过更新
     bool healthyFusion = true;
     for (uint8_t i= 0; i<=stateIndexLim; i++) {
-        if (KHP[i][i] > P[i][i]) {
+        if (KHP[i][i] > P[i][i]) { //P = (I - K*H)*P > 0,则为健康融合
             healthyFusion = false;
         }
     }
 
     if (healthyFusion) {
-        // update the covariance matrix
+        // 更新协方差矩阵---update the covariance matrix
         for (uint8_t i= 0; i<=stateIndexLim; i++) {
             for (uint8_t j= 0; j<=stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
@@ -1145,22 +1171,26 @@ void NavEKF2_core::FuseDeclination(float declErr)
         }
 
         // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+        // 强制协方差矩阵对称并限制方差以防止病态
         ForceSymmetry();
         ConstrainVariances();
 
         // zero the attitude error state - by definition it is assumed to be zero before each observation fusion
+        // 将姿态误差状态归零-根据定义，在每次观测融合之前，假设姿态误差状态为零
         stateStruct.angErr.zero();
 
-        // correct the state vector
+        //修正状态向量--- correct the state vector
         for (uint8_t j= 0; j<=stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovation;
         }
 
         // the first 3 states represent the angular misalignment vector. This is
         // is used to correct the estimated quaternion on the current time step
+        // 前3个状态表示角度偏差向量。这是用于更正当前时间步长上估计的四元数
         stateStruct.quat.rotate(stateStruct.angErr);
 
         // record fusion health status
+        // 记录融合健康状态
         faultStatus.bad_decl = false;
     } else {
         // record fusion health status
