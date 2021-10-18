@@ -18,7 +18,7 @@ extern const AP_HAL::HAL& hal;
 
 // Reset velocity states to last GPS measurement if available or to zero if in constant position mode or if PV aiding is not absolute
 // Do not reset vertical velocity using GPS as there is baro alt available to constrain drift
-/*将速度状态重置为上一次GPS测量值(如果可用)，或将速度状态重置为0(如果处于恒定位置模式或PV辅助不是绝对值)， 
+/*将速度状态重置为上一次GPS测量值(如果可用)，或将速度状态重置为0(如果处于恒定位置模式或PV辅助不是绝对模式)， 
  *请勿使用GPS重置垂直速度，因为存在气压计高度可用于约束漂移*/
 void NavEKF2_core::ResetVelocity(void)
 {

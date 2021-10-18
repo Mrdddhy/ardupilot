@@ -79,7 +79,7 @@ AP_AHRS_DCM::update(bool skip_ins_update)
 
     if (!skip_ins_update) {
         // tell the IMU to grab some data
-        AP::ins().update();//这里不会执行
+        AP::ins().update();//这里不会执行，INS不会更新
     }
 
     const AP_InertialSensor &_ins = AP::ins();

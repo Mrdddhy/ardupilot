@@ -128,11 +128,13 @@ bool NavEKF2_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
 void NavEKF2_core::InitialiseVariables()
 {
     // calculate the nominal filter update rate
+    // 计算标称过滤器更新率
     const AP_InertialSensor &ins = AP::ins();
     localFilterTimeStep_ms = (uint8_t)(1000*ins.get_loop_delta_t());
     localFilterTimeStep_ms = MAX(localFilterTimeStep_ms,10);
 
     // initialise time stamps
+    // 初始化时间戳
     imuSampleTime_ms = frontend->imuSampleTime_us / 1000;
     prevTasStep_ms = imuSampleTime_ms;
     prevBetaStep_ms = imuSampleTime_ms;
@@ -164,6 +166,7 @@ void NavEKF2_core::InitialiseVariables()
     terrainHgtStableSet_ms = 0;
 
     // initialise other variables
+    // 初始化其他变量
     gpsNoiseScaler = 1.0f;
     hgtTimeout = true;
     tasTimeout = true;
@@ -279,6 +282,7 @@ void NavEKF2_core::InitialiseVariables()
     memset(&velPosObs, 0, sizeof(velPosObs));
 
     // range beacon fusion variables
+    // 距离信标融合变量
     memset((void *)&rngBcnDataNew, 0, sizeof(rngBcnDataNew));
     memset((void *)&rngBcnDataDelayed, 0, sizeof(rngBcnDataDelayed));
     rngBcnStoreIndex = 0;
@@ -318,6 +322,7 @@ void NavEKF2_core::InitialiseVariables()
     last_gps_idx = 0;
 
     // external nav data fusion
+    // 外部导航数据融合
     memset((void *)&extNavDataNew, 0, sizeof(extNavDataNew));
     memset((void *)&extNavDataDelayed, 0, sizeof(extNavDataDelayed));
     extNavDataToFuse = false;
@@ -328,6 +333,7 @@ void NavEKF2_core::InitialiseVariables()
     extNavYawResetRequest = false;
 
     // zero data buffers
+    // 数据缓冲区重置
     storedIMU.reset();
     storedGPS.reset();
     storedBaro.reset();
@@ -338,6 +344,7 @@ void NavEKF2_core::InitialiseVariables()
     storedExtNav.reset();
 
     // now init mag variables
+    // 现在初始化mag变量
     yawAlignComplete = false;
     have_table_earth_field = false;
 
@@ -350,6 +357,7 @@ void NavEKF2_core::InitialiseVariables()
 
 /*
   separate out the mag reset so it can be used when compass learning completes
+  分离磁力计复位，以便在罗盘学习完成时使用
  */
 void NavEKF2_core::InitialiseVariablesMag()
 {
@@ -374,7 +382,7 @@ void NavEKF2_core::InitialiseVariablesMag()
     yawInnovAtLastMagReset = 0.0f;
     magFieldLearned = false;
 
-    storedMag.reset();
+    storedMag.reset();//将环形缓冲区中的所有数据归零
 }
 
 // Initialise the states from accelerometer and magnetometer data (if present)
@@ -385,7 +393,7 @@ void NavEKF2_core::InitialiseVariablesMag()
 bool NavEKF2_core::InitialiseFilterBootstrap(void)
 {
     // If we are a plane and don't have GPS lock then don't initialise
-    /*如果是一架飞机，没有GPS锁，不要进行初始化，固定翼机型等待GPS 3D定位后开始初始化滤波器*/
+    /*如果是一架飞机，没有GPS锁，不要进行初始化，即固定翼机型等待GPS 3D定位后开始初始化滤波器*/
     if (assume_zero_sideslip() && AP::gps().status() < AP_GPS::GPS_OK_FIX_3D) {
         hal.util->snprintf(prearm_fail_string,
                            sizeof(prearm_fail_string),
@@ -393,7 +401,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
         statesInitialised = false;
         return false;
     }
-
+    /*这里一开始不会执行*/
     if (statesInitialised) {
         // we are initialised, but we don't return true until the IMU
         // buffer has been filled. This prevents a timing
@@ -416,7 +424,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     // Initialise IMU data
     /*初始化IMU数据*/
     dtIMUavg = ins.get_loop_delta_t();
-    readIMUData();
+    readIMUData();/*读取IMU数据，进行下采样，存储到FIFO缓冲区*/
     storedIMU.reset_history(imuDataNew);
     imuDataDelayed = imuDataNew;
 
@@ -448,7 +456,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     }
 
     // calculate initial roll and pitch orientation
-    /*计算初始滚转和俯仰方向*/
+    /*计算初始滚转和俯仰方向--初始姿态*/
     stateStruct.quat.from_euler(roll, pitch, 0.0f);
 
     // initialise dynamic states
@@ -469,13 +477,13 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     stateStruct.body_magfield.zero();
 
     // read the GPS and set the position and velocity states
-    /*读取GPS并重置位置和速度状态*/
+    /*读取GPS并设置位置和速度状态*/
     readGpsData();
     ResetVelocity();
     ResetPosition();
 
     // read the barometer and set the height state
-    /*读取气压计并重置高度状态*/
+    /*读取气压计并设置高度状态*/
     readBaroData();
     ResetHeight();
 
@@ -496,7 +504,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     statesInitialised = true;
 
     // reset inactive biases
-    /*重置为不活跃偏差
+    /*重置未激活的陀螺仪的偏差和尺度
       这可以让我们了解，如果由于传感器故障而不得不切换到另一个陀螺仪，每个车道需要的陀螺仪偏差。 这防止了IMU失效时陀螺偏差的突然变化  
       */
     for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
@@ -508,7 +516,7 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
     }
 
     // we initially return false to wait for the IMU buffer to fill
-    /*我们最初返回false以等待IMU缓冲区填充*/
+    /*我们最初返回false以等待IMU缓冲区填充，也就是说第二次及后面再进来的直接进入if (statesInitialised)里面等待数据缓冲区直至为满为止，再返回true*/
     return false;
 }
 
@@ -803,7 +811,7 @@ void NavEKF2_core::calcOutputStates()
     // 将修正应用于跟踪EKF解---apply corrections to track EKF solution
     Vector3f delAng = delAngNewCorrected + delAngCorrection;
 
-    //将获取的四元数进行归一化-- convert the rotation vector to its equivalent quaternion
+    //将旋转向量转换为其等效的四元数-- convert the rotation vector to its equivalent quaternion
     Quaternion deltaQuat;
     deltaQuat.from_axis_angle(delAng);
 
@@ -886,7 +894,7 @@ void NavEKF2_core::calcOutputStates()
         outputDataDelayed = storedOutput[storedIMU.get_oldest_index()];
 
         // compare quaternion data with EKF quaternion at the fusion time horizon and calculate correction
-        // 在融合时间范围内比较四元数数据与EKF四元数，并计算校正
+        // 比较四元数数据与在融合时间范围内的EKF四元数，并计算修正
         // divide the demanded quaternion by the estimated to get the error
         // 将所需的四元数除以估计值，得到误差
         Quaternion quatErr = stateStruct.quat / outputDataDelayed.quat;
@@ -929,7 +937,7 @@ void NavEKF2_core::calcOutputStates()
         outputTrackError.z = posErr.length();
 
         // convert user specified time constant from centi-seconds to seconds
-        // 将用户指定的时间常数从厘米秒转换为秒
+        // 将用户指定的时间常数从百秒转换为秒
         float tauPosVel = constrain_float(0.01f*(float)frontend->_tauVelPosOutput, 0.1f, 0.5f);
 
         // calculate a gain to track the EKF position states with the specified time constant
@@ -953,10 +961,10 @@ void NavEKF2_core::calcOutputStates()
         for (unsigned index=0; index < imu_buffer_length; index++) {
             outputStates = storedOutput[index];
 
-            //应用等速校正-- a constant  velocity correction is applied
+            //应用常量速度量修正-- a constant  velocity correction is applied
             outputStates.velocity += velCorrection;
 
-            //应用恒定位置校正--- a constant position correction is applied
+            //应用恒定位置量修正--- a constant position correction is applied
             outputStates.position += posCorrection;
 
             //将更新后的数据推送到缓冲区--push the updated data to the buffer

@@ -484,6 +484,7 @@ private:
 
     // bias estimates for the IMUs that are enabled but not being used
     // by this core.
+    /*该核心启用但未使用的IMU偏差估计*/
     struct {
         Vector3f gyro_bias;
         Vector3f gyro_scale;
@@ -915,7 +916,7 @@ private:
     uint32_t timeTasReceived_ms;    // time last TAS data was received (msec)
     bool gpsGoodToAlign;            // true when the GPS quality can be used to initialise the navigation system
     uint32_t magYawResetTimer_ms;   // timer in msec used to track how long good magnetometer data is failing innovation consistency checks
-    bool consistentMagData;         // true when the magnetometers are passing consistency checks
+    bool consistentMagData;         // 当磁强计通过一致性检查时为真--true when the magnetometers are passing consistency checks
     bool motorsArmed;               // true when the motors have been armed
     bool prevMotorsArmed;           // value of motorsArmed from previous frame
     bool posVelFusionDelayed;       // true when the position and velocity fusion has been delayed
@@ -956,6 +957,7 @@ private:
     Vector3f posOffsetNED;          // This adds to the earth frame position estimate at the IMU to give the position at the body origin (m)
 
     // variables used to calculate a vertical velocity that is kinematically consistent with the verical position
+    // 用于计算垂直速度的变量，该速度在运动学上与真实位置一致
     struct {
         float pos;
         float vel;
@@ -970,12 +972,12 @@ private:
     float gpsHorizVelFilt;          // amount of filtered horizontal GPS velocity detected during pre-flight GPS checks
 
     // variable used by the in-flight GPS quality check
-    bool gpsSpdAccPass;             // true when reported GPS speed accuracy passes in-flight checks
-    bool ekfInnovationsPass;        // true when GPS innovations pass in-flight checks
+    bool gpsSpdAccPass;             // 当报告的GPS速度精度通过飞行检查时为真--true when reported GPS speed accuracy passes in-flight checks
+    bool ekfInnovationsPass;        // 当GPS残差通过飞行检查时为真--true when GPS innovations pass in-flight checks
     float sAccFilterState1;         // state variable for LPF applid to reported GPS speed accuracy
     float sAccFilterState2;         // state variable for peak hold filter applied to reported GPS speed
     uint32_t lastGpsCheckTime_ms;   // last time in msec the GPS quality was checked
-    uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
+    uint32_t lastInnovPassTime_ms;  // 上一次GPS残差以毫秒为单位通过--last time in msec the GPS innovations passed
     uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
 

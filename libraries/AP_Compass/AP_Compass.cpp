@@ -1644,12 +1644,14 @@ Compass::use_for_yaw(void) const
 }
 
 /// return true if the specified compass can be used for yaw calculations
+// 如果指定的磁力计可用于偏航计算，则返回true
 bool
 Compass::use_for_yaw(uint8_t i) const
 {
     // when we are doing in-flight compass learning the state
     // estimator must not use the compass. The learning code turns off
     // inflight learning when it has converged
+    /*当我们进行飞行罗盘学习时，状态估计器不得使用罗盘。学习代码在收敛后关闭机上学习*/
     return _use_for_yaw[Priority(i)] && _learn.get() != LEARN_INFLIGHT;
 }
 
@@ -1871,7 +1873,7 @@ void Compass::motor_compensation_type(const uint8_t comp_type)
         }
     }
 }
-
+/*磁力计方向一致性检测*/
 bool Compass::consistent() const
 {
     const Vector3f &primary_mag_field = get_field();
@@ -1906,16 +1908,19 @@ bool Compass::consistent() const
         const float xy_ang_diff  = acosf(constrain_float(mag_field_xy*primary_mag_field_xy_norm,-1.0f,1.0f));
 
         // check for gross misalignment on all axes
+        // 检查所有轴上是否存在严重偏差
         if (xyz_ang_diff > AP_COMPASS_MAX_XYZ_ANG_DIFF) {
             return false;
         }
 
         // check for an unacceptable angle difference on the xy plane
+        // 检查xy平面上是否存在不可接受的角度差
         if (xy_ang_diff > AP_COMPASS_MAX_XY_ANG_DIFF) {
             return false;
         }
 
         // check for an unacceptable length difference on the xy plane
+        // 检查xy平面上是否存在不可接受的长度差
         if (xy_len_diff > AP_COMPASS_MAX_XY_LENGTH_DIFF) {
             return false;
         }

@@ -451,7 +451,8 @@ private:
     const float gndEffectBaroScaler = 4.0f;        // scaler applied to the barometer observation variance when ground effect mode is active
     const uint8_t fusionTimeStep_ms = 10;          // The minimum time interval between covariance predictions and measurement fusions in msec
 
-    // origin set by one of the cores
+    // 由一个核设置的原点--origin set by one of the cores
+    /* 这可防止不同核的EKF原点初始化为不同的值。公共值存储在前端，如果没有原点，则由核使用*/
     struct Location common_EKF_origin;
     bool common_origin_valid;
 

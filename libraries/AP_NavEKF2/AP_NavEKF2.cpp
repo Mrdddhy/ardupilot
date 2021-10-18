@@ -705,6 +705,7 @@ bool NavEKF2::InitialiseFilter(void)
     }
 
     // invalidate shared origin
+    // 使共享原点无效
     common_origin_valid = false;
     
     // initialise the cores. We return success only if all cores

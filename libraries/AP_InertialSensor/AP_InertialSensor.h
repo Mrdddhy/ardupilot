@@ -10,6 +10,7 @@
 /**
    maximum number of INS instances available on this platform. If more
    than 1 then redundant sensors may be available
+   此平台上可用的INS实例的最大数量。如果超过1个，则冗余传感器可能可用
  */
 #define INS_MAX_INSTANCES 3
 #define INS_MAX_BACKENDS  6
@@ -93,9 +94,9 @@ public:
     void init_gyro(void);
 
     /// Fetch the current gyro values
-    ///
+    /// 获取当前陀螺仪值
     /// @returns	vector of rotational rates in radians/sec
-    ///
+    /// 返回：以弧度/秒为单位的旋转速率矢量
     const Vector3f     &get_gyro(uint8_t i) const { return _gyro[i]; }
     const Vector3f     &get_gyro(void) const { return get_gyro(_primary_gyro); }
 
@@ -118,9 +119,9 @@ public:
     float get_delta_velocity_dt() const { return get_delta_velocity_dt(_primary_accel); }
 
     /// Fetch the current accelerometer values
-    ///
+    /// 获取当前加速度计值
     /// @returns	vector of current accelerations in m/s/s
-    ///
+    /// 返回：以m/s/s为单位的当前加速度矢量
     const Vector3f     &get_accel(uint8_t i) const { return _accel[i]; }
     const Vector3f     &get_accel(void) const { return get_accel(_primary_accel); }
 
@@ -157,6 +158,7 @@ public:
     const Vector3f &get_accel_scale(void) const { return get_accel_scale(_primary_accel); }
 
     // return a 3D vector defining the position offset of the IMU accelerometer in metres relative to the body frame origin
+    /*返回一个3D矢量，该矢量定义IMU加速计相对于机体系原点的位置偏移（以米为单位）*/
     const Vector3f &get_imu_pos_offset(uint8_t instance) const {
         return _accel_pos[instance];
     }
@@ -170,6 +172,7 @@ public:
 
     /* get_delta_time returns the time period in seconds
      * overwhich the sensor data was collected
+     * get_delta_time返回收集传感器数据的时间段（以秒为单位）
      */
     float get_delta_time() const { return MIN(_delta_time, _loop_delta_t_max); }
 
@@ -196,6 +199,7 @@ public:
     uint16_t get_sample_rate(void) const { return _sample_rate; }
 
     // return the main loop delta_t in seconds
+    // 以秒为单位返回主循环增量
     float get_loop_delta_t(void) const { return _loop_delta_t; }
 
     bool healthy(void) const { return get_gyro_health() && get_accel_health(); }

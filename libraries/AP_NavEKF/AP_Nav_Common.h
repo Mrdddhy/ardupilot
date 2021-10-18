@@ -63,6 +63,7 @@ static_assert(sizeof(uint16_t) == sizeof(nav_gps_status), "nav_gps_status must b
 
 /*
   structure to hold EKF timing statistics
+  保存EKF定时统计信息的结构
  */
 struct ekf_timing {
     uint32_t count;

@@ -439,20 +439,24 @@ bool NavEKF2_core::setOriginLLH(const Location &loc)
 }
 
 // Set the NED origin to be used until the next filter reset
+/* 设置要使用的NED原点，直到下一个过滤器重置*/
 void NavEKF2_core::setOrigin(const Location &loc)
 {
     EKF_origin = loc;
     // if flying, correct for height change from takeoff so that the origin is at field elevation
+    // 如果是飞行，请更正起飞时的高度变化，以便原点位于场地高程
     if (inFlight) {
         EKF_origin.alt += (int32_t)(100.0f * stateStruct.position.z);
     }
     ekfGpsRefHgt = (double)0.01 * (double)EKF_origin.alt;
     // define Earth rotation vector in the NED navigation frame at the origin
+    // 在原点的导航框中定义地球旋转矢量
     calcEarthRateNED(earthRateNED, EKF_origin.lat);
     validOrigin = true;
     gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u origin set",(unsigned)imu_index);
 
     // put origin in frontend as well to ensure it stays in sync between lanes
+    // 将原点也放在前端，以确保它在车道之间保持同步
     frontend->common_EKF_origin = EKF_origin;
     frontend->common_origin_valid = true;
 }

@@ -1567,10 +1567,10 @@ bool AP_InertialSensor::get_delta_angle(uint8_t i, Vector3f &delta_angle) const
 */
 bool AP_InertialSensor::get_delta_velocity(uint8_t i, Vector3f &delta_velocity) const
 {
-    if (_delta_velocity_valid[i]) {
+    if (_delta_velocity_valid[i]) {//如果增量速度最新有效，则直接获取
         delta_velocity = _delta_velocity[i];
         return true;
-    } else if (get_accel_health(i)) {
+    } else if (get_accel_health(i)) {//如果加速度计健康，则计算获取
         delta_velocity = get_accel(i) * get_delta_time();
         return true;
     }
