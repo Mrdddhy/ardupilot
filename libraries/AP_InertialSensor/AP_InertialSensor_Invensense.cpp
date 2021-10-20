@@ -433,7 +433,7 @@ void AP_InertialSensor_Invensense::_poll_data()
 /*函数功能：计算处理并发布IMU相关数据*/
 bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_samples)
 {
-    for (uint8_t i = 0; i < n_samples; i++) {
+    for (uint8_t i = 0; i < n_samples; i++) {//循环读取处理再发布出去
         const uint8_t *data = samples + MPU_SAMPLE_SIZE * i;
         Vector3f accel, gyro;
         bool fsync_set = false;/*帧同步设置*/
@@ -445,7 +445,7 @@ bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_sampl
         accel = Vector3f(int16_val(data, 1),
                          int16_val(data, 0),
                          -int16_val(data, 2));//这里是加速度计原始数据，右前上转化到前右下
-        accel *= _accel_scale;//转化成多少g
+        accel *= _accel_scale;//转化成多少g，_accel_scale = GRAVITY_MSS / 4096.f
 
         int16_t t2 = int16_val(data, 3);/*这个数据是跟温度有关的数据*/
         /*如果温度数据有问题*/
@@ -654,8 +654,9 @@ void AP_InertialSensor_Invensense::_read_fifo()
     
 check_registers:
     // check next register value for correctness
+    // 检查下一个寄存器值的正确性
     _dev->set_speed(AP_HAL::Device::SPEED_LOW);
-    if (!_dev->check_next_register()) {
+    if (!_dev->check_next_register()) {//不能读到则增加实例，读取下一个实例对应的
         _inc_gyro_error_count(_gyro_instance);
         _inc_accel_error_count(_accel_instance);
     }

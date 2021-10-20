@@ -233,6 +233,7 @@ AP_MotorsMulticopter::AP_MotorsMulticopter(uint16_t loop_rate, uint16_t speed_hz
 };
 
 // output - sends commands to the motors
+// 向电机发送命令
 void AP_MotorsMulticopter::output()
 {
     // update throttle filter
@@ -269,6 +270,7 @@ void AP_MotorsMulticopter::output_boost_throttle(void)
 }
 
 // sends minimum values out to the motors
+// 将最小值发送到电机
 void AP_MotorsMulticopter::output_min()
 {
     set_desired_spool_state(DesiredSpoolState::SHUT_DOWN);

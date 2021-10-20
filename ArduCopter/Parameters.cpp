@@ -1126,10 +1126,11 @@ void Copter::load_parameters(void)
     AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
 
     // convert landing gear parameters
-    /*转化起落架参数*/
+    /*转换起落架参数*/
     convert_lgr_parameters();
 
     // convert fs_options parameters
+    /*转换失控可选参数*/
     convert_fs_options_params();
     
     /*打印加载所有参数消耗了多长时间：us*/
@@ -1566,6 +1567,7 @@ void Copter::convert_tradheli_parameters(void)
 void Copter::convert_fs_options_params(void)
 {
     // If FS_OPTIONS has already been configured and we don't change it.
+    // 如果已经配置了失控选项，并且我们没有更改它。
     enum ap_var_type ptype;
     AP_Int32 *fs_opt = (AP_Int32 *)AP_Param::find("FS_OPTIONS", &ptype);
 
@@ -1574,6 +1576,7 @@ void Copter::convert_fs_options_params(void)
     }
 
     // Variable to capture the new FS_OPTIONS setting
+    // 捕获新的失控选项的设置变量
     int32_t fs_options_converted = 0;
 
     // If FS_THR_ENABLED is 2 (continue mission), change to RTL and add continue mission to the new FS_OPTIONS parameter

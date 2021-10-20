@@ -338,7 +338,7 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
   参数1：实例
   参数2：加速度原始数据
   参数3：采样频率us
-  参数4：
+  参数4：帧同步设置标志
 */
 void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
                                                              const Vector3f &accel,
@@ -350,7 +350,7 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
     }
     float dt;
     
-    /*更新加速度计实例对应的采样起始时间、原始采样时间*/
+    /*更新加速度计实例对应的采样起始时间、原始采样频率*/
     _update_sensor_rate(_imu._sample_accel_count[instance], _imu._sample_accel_start_us[instance],
                         _imu._accel_raw_sample_rates[instance]);
 
@@ -369,14 +369,14 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
       NON-FIFO传感器不会聚集样本，但也往往在实际速率变化，
       所以我们使用提供的sample_us来获得deltaT,两者之间的区别在于是否提供了sample_us.
 
-      * sample_us = 0，即采用原始采样方式计算dt
+      * 参数：sample_us = 0，即采用原始采样方式计算dt
      */
     if (sample_us != 0 && _imu._accel_last_sample_us[instance] != 0) {
         dt = (sample_us - _imu._accel_last_sample_us[instance]) * 1.0e-6f;
         _imu._accel_last_sample_us[instance] = sample_us;
     } else {
         // don't accept below 100Hz
-        /*不超过低于100Hz*/
+        /*不接受低于100Hz*/
         if (_imu._accel_raw_sample_rates[instance] < 100) {
             return;
         }

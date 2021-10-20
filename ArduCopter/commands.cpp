@@ -1,18 +1,22 @@
 #include "Copter.h"
 
 // checks if we should update ahrs/RTL home position from the EKF
+// 检查我们是否应该从EKF更新ahrs/RTL起始位置
 void Copter::update_home_from_EKF()
 {
     // exit immediately if home already set
+    // 如果已设置home，请立即退出
     if (ahrs.home_is_set()) {
         return;
     }
 
     // special logic if home is set in-flight
+    // 如果在飞行中设置了home，则为特殊逻辑
     if (motors->armed()) {
         set_home_to_current_location_inflight();
     } else {
         // move home to current ekf location (this will set home_state to HOME_SET)
+        // 移回当前ekf位置
         if (!set_home_to_current_location(false)) {
             // ignore failure
         }

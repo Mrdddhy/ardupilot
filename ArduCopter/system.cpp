@@ -251,6 +251,7 @@ void Copter::init_ardupilot()
 #endif
 
     // initialise AP_Logger library
+    // 初始化AP_Logger库
     logger.setVehicle_Startup_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 
     /*IMU传感器注册开始*/
@@ -315,7 +316,7 @@ void Copter::startup_INS_ground()
     ins.init(scheduler.get_loop_rate_hz());/*预热和校准陀螺仪偏差*/
 
     // reset ahrs including gyro bias
-    ahrs.reset();//初始化EKF
+    ahrs.reset();//--初始化EKF--
 }
 
 // update the harmonic notch filter center frequency dynamically

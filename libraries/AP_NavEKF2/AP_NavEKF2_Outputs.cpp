@@ -151,6 +151,7 @@ void NavEKF2_core::getTiltError(float &ang) const
 }
 
 // return the transformation matrix from XYZ (body) to NED axes
+// 返回从XYZ（实体）到NED轴的变换矩阵
 void NavEKF2_core::getRotationBodyToNED(Matrix3f &mat) const
 {
     outputDataNew.quat.rotation_matrix(mat);
@@ -280,21 +281,30 @@ bool NavEKF2_core::getPosNE(Vector2f &posNE) const
 
 // Write the last calculated D position of the body frame origin relative to the EKF origin (m).
 // Return true if the estimate is valid
+/* 写入上次计算的车身框架原点相对于EKF原点的D位置（m）.如果估计值有效，则返回true*/
 bool NavEKF2_core::getPosD(float &posD) const
 {
     // The EKF always has a height estimate regardless of mode of operation
     // Correct for the IMU offset in body frame (EKF calculations are at the IMU)
     // Also correct for changes to the origin height
+    /* 无论运行模式如何，EKF始终具有高度估计值
+       修正车身框架中的IMU偏移（EKF计算在IMU处）
+       还可以修正原点高度的更改
+    */
     if ((frontend->_originHgtMode & (1<<2)) == 0) {
         // Any sensor height drift corrections relative to the WGS-84 reference are applied to the origin.
+        /* 相对于WGS-84基准的任何传感器高度漂移校正均应用于原点。*/
         posD = outputDataNew.position.z + posOffsetNED.z;
     } else {
         // The origin height is static and corrections are applied to the local vertical position
         // so that height returned by getLLH() = height returned by getOriginLLH - posD
+        /* 原点高度是静态的，并将修正应用于局部垂直位置
+           所以getLLH（）返回的高度=getOriginLLH-posD返回的高度*/
         posD = outputDataNew.position.z + posOffsetNED.z + 0.01f * (float)EKF_origin.alt - (float)ekfGpsRefHgt;
     }
 
     // Return the current height solution status
+    /* 返回当前高度解决方案状态*/
     return filterStatus.flags.vert_pos;
 
 }
@@ -312,6 +322,10 @@ bool NavEKF2_core::getHAGL(float &HAGL) const
 // If a calculated location isn't available, return a raw GPS measurement
 // The status will return true if a calculation or raw measurement is available
 // The getFilterStatus() function provides a more detailed description of data health and must be checked if data is to be used for flight control
+/* 返回WGS-84中机体系原点的上一次计算的纬度、经度和高度
+   如果计算的位置不可用，请返回原始GPS测量值
+   如果计算或原始测量可用，状态将返回true
+   getFilterStatus（）函数提供了数据运行状况的更详细描述，如果要将数据用于飞行控制，则必须检查该函数*/
 bool NavEKF2_core::getLLH(struct Location &loc) const
 {
     const AP_GPS &gps = AP::gps();
@@ -320,6 +334,7 @@ bool NavEKF2_core::getLLH(struct Location &loc) const
 
     if(getPosD(posD) && getOriginLLH(origin)) {
         // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
+        // 返回的高度是相对于WGS-84球体的绝对高度
         loc.alt =  origin.alt - posD*100;
         loc.relative_alt = 0;
         loc.terrain_alt = 0;
@@ -385,6 +400,7 @@ bool NavEKF2_core::getOriginLLH(struct Location &loc) const
     if (validOrigin) {
         loc = EKF_origin;
         // report internally corrected reference height if enabled
+        // 报告内部校正的参考高度（如果启用）
         if ((frontend->_originHgtMode & (1<<2)) == 0) {
             loc.alt = (int32_t)(100.0f * (float)ekfGpsRefHgt);
         }

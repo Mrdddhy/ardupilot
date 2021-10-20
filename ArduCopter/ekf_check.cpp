@@ -185,9 +185,11 @@ void Copter::failsafe_ekf_off_event(void)
 }
 
 // check for ekf yaw reset and adjust target heading, also log position reset
+// 检查ekf偏航重置并调整目标航向，同时记录位置重置
 void Copter::check_ekf_reset()
 {
     // check for yaw reset
+    // 检查偏航重置
     float yaw_angle_change_rad;
     uint32_t new_ekfYawReset_ms = ahrs.getLastYawResetAngle(yaw_angle_change_rad);
     if (new_ekfYawReset_ms != ekfYawReset_ms) {

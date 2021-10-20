@@ -218,7 +218,7 @@ constexpr int8_t Copter::_failsafe_priorities[7];
 void Copter::setup()
 {
     // Load the default values of variables listed in var_info[]s
-    AP_Param::setup_sketch_defaults();/*加载一些变量默认的初始化参数*/
+    AP_Param::setup_sketch_defaults();/*加载var_info[]中列出的变量的默认值*/
 
     init_ardupilot();/*初始化底层驱动相关的，诸如传感器注册，加载相关参数，建立与后端的关系*/
 
@@ -269,7 +269,7 @@ void Copter::fast_loop()
     update_flight_mode();//更新飞行模式，运行姿态控制器
 
     // update home from EKF if necessary
-    update_home_from_EKF();//必要时从EKF更新起飞点的位置
+    update_home_from_EKF();//必要时从EKF更新家的位置
 
     // check if we've landed or crashed
     update_land_and_crash_detectors();//检查飞机是否着落或坠毁
@@ -579,6 +579,7 @@ void Copter::update_super_simple_bearing(bool force_update)
 void Copter::read_AHRS(void)
 {
     // Perform IMU calculations and get attitude info
+    // 执行IMU计算并获取姿态信息
     //-----------------------------------------------
 #if HIL_MODE != HIL_MODE_DISABLED
     // update hil before ahrs update

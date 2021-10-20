@@ -16,6 +16,7 @@
 void AP_InertialNav_NavEKF::update(bool high_vibes)
 {
     // get the NE position relative to the local earth frame origin
+    // 获取相对于局部地球系原点的NE位置
     Vector2f posNE;
     if (_ahrs_ekf.get_relative_position_NE_origin(posNE)) {
         _relpos_cm.x = posNE.x * 100; // convert from m to cm
@@ -23,15 +24,18 @@ void AP_InertialNav_NavEKF::update(bool high_vibes)
     }
 
     // get the D position relative to the local earth frame origin
+    // 获取相对于局部地球系原点的垂直位置
     float posD;
     if (_ahrs_ekf.get_relative_position_D_origin(posD)) {
         _relpos_cm.z = - posD * 100; // convert from m in NED to cm in NEU
     }
 
     // get the velocity relative to the local earth frame
+    // 获取相对于局部地球系原点的垂直速度 
     Vector3f velNED;
     if (_ahrs_ekf.get_velocity_NED(velNED)) {
         // during high vibration events use vertical position change
+        // 在高振动事件中，使用垂直位置变化
         if (high_vibes) {
             float rate_z;
             if (_ahrs_ekf.get_vert_pos_rate(rate_z)) {
@@ -88,6 +92,7 @@ float AP_InertialNav_NavEKF::get_speed_xy() const
 
 /**
  * get_altitude - get latest altitude estimate in cm
+ * get_altitude - 获取以厘米为单位的最新高度估计值
  * @return
  */
 float AP_InertialNav_NavEKF::get_altitude() const

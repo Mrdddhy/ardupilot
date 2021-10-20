@@ -311,6 +311,7 @@ bool Copter::set_mode(const uint8_t new_mode, const ModeReason reason)
 
 // update_flight_mode - calls the appropriate attitude controllers based on flight mode
 // called at 100hz or more
+/* 更新飞行模式---根据飞行模式调用相应的姿态控制器，以100hz或更高频率调用*/
 void Copter::update_flight_mode()
 {
     surface_tracking.invalidate_for_logging();  // invalidate surface tracking alt, flight mode will set to true if used

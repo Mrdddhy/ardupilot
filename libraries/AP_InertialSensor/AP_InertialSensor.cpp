@@ -509,7 +509,7 @@ AP_InertialSensor *AP_InertialSensor::get_singleton()
 uint8_t AP_InertialSensor::register_gyro(uint16_t raw_sample_rate_hz,
                                          uint32_t id)
 {
-    /*INS最大实例个数是6*/
+    /*INS最大实例个数是3*/
     if (_gyro_count == INS_MAX_INSTANCES) {
         AP_HAL::panic("Too many gyros");
     }
@@ -526,7 +526,7 @@ uint8_t AP_InertialSensor::register_gyro(uint16_t raw_sample_rate_hz,
         _gyro_cal_ok[_gyro_count] = false;
     }
 
-    _gyro_id[_gyro_count].set((int32_t) id);
+    _gyro_id[_gyro_count].set((int32_t) id);/*ID一致则设置*/
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     if (!saved) {

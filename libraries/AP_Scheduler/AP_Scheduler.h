@@ -110,9 +110,10 @@ public:
     float load_average();
 
     // get the active main loop rate
+    // 获取活跃的主循环速率
     uint16_t get_loop_rate_hz(void) {
         if (_active_loop_rate_hz == 0) {
-            _active_loop_rate_hz = _loop_rate_hz;
+            _active_loop_rate_hz = _loop_rate_hz;//默认是50Hz,允许50~2000Hz
         }
         return _active_loop_rate_hz;
     }
@@ -158,7 +159,7 @@ private:
     AP_Int8 _debug;
 
     // overall scheduling rate in Hz
-    /*整体调度频率*/
+    /*整体调度频率，默认是50Hz,但是允许范围是50~2000Hz*/
     AP_Int16 _loop_rate_hz;
 
     // loop rate in Hz as set at startup

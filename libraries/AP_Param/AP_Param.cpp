@@ -317,6 +317,7 @@ bool AP_Param::check_var_info(void)
 
 
 // setup the _var_info[] table
+// 设置_var_info[]表
 bool AP_Param::setup(void)
 {
     struct EEPROM_header hdr {};

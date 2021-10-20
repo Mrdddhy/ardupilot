@@ -890,6 +890,7 @@ int8_t NavEKF2::getPrimaryCoreIndex(void) const
 
 // returns the index of the IMU of the primary core
 // return -1 if no primary core selected
+/* 返回主核心的IMU索引,如果未选择主核心，则返回-1*/
 int8_t NavEKF2::getPrimaryCoreIMUIndex(void) const
 {
     if (!core) {
@@ -951,6 +952,7 @@ void NavEKF2::getAccelNED(Vector3f &accelNED) const
 }
 
 // return body axis gyro bias estimates in rad/sec
+// 返回体轴陀螺偏差估计值（rad/sec）
 void NavEKF2::getGyroBias(int8_t instance, Vector3f &gyroBias) const
 {
     if (instance < 0 || instance >= num_cores) instance = primary;
@@ -1159,6 +1161,7 @@ bool NavEKF2::getHAGL(float &HAGL) const
 }
 
 // return the Euler roll, pitch and yaw angle in radians for the specified instance
+// 返回指定实例的Euler滚动、俯仰和偏航角度（以弧度为单位）
 void NavEKF2::getEulerAngles(int8_t instance, Vector3f &eulers) const
 {
     if (instance < 0 || instance >= num_cores) instance = primary;
@@ -1168,6 +1171,7 @@ void NavEKF2::getEulerAngles(int8_t instance, Vector3f &eulers) const
 }
 
 // return the transformation matrix from XYZ (body) to NED axes
+// 返回从XYZ（机体）到NED轴的变换矩阵
 void NavEKF2::getRotationBodyToNED(Matrix3f &mat) const
 {
     if (core) {

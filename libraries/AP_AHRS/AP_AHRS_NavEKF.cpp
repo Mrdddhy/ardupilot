@@ -166,8 +166,9 @@ void AP_AHRS_NavEKF::update_EKF2(void)
     if (!_ekf2_started) {  /*_ekf2_started = 0*/
         // wait 1 second for DCM to output a valid tilt error estimate
         if (start_time_ms == 0) {
-            start_time_ms = AP_HAL::millis();/*等待一秒用于DCM输出有效的倾斜估计*/
+            start_time_ms = AP_HAL::millis();/*获取当前时间*/
         }
+        /*等待一秒用于DCM输出有效的倾斜估计,startup_delay_ms =  1000ms*/
         if (AP_HAL::millis() - start_time_ms > startup_delay_ms || _force_ekf) {
             _ekf2_started = EKF2.InitialiseFilter();/*初始化滤波器，为运行EKF2做更新准备*/
             if (_force_ekf) {
@@ -188,8 +189,8 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             pitch = eulers.y;
             yaw   = eulers.z;
 
-            update_cd_values();
-            update_trig();
+            update_cd_values();//更新角度的百倍值
+            update_trig();//更新三角函数数值
 
             // Use the primary EKF to select the primary gyro
             /*使用优先级比较高的gyro做EKF运算*/
@@ -204,23 +205,28 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             */
             _gyro_drift.zero();
             EKF2.getGyroBias(-1,_gyro_drift);
-            _gyro_drift = -_gyro_drift;
+            _gyro_drift = -_gyro_drift;//改变方向
 
             // calculate corrected gyro estimate for get_gyro()
+            // 计算get_gyro()的修正陀螺估计值
             _gyro_estimate.zero();
             if (primary_imu == -1 || !_ins.get_gyro_health(primary_imu)) {
                 // the primary IMU is undefined so use an uncorrected default value from the INS library
+                // 主IMU未定义，因此请使用INS库中未更正的默认值
                 _gyro_estimate = _ins.get_gyro();
             } else {
                 // use the same IMU as the primary EKF and correct for gyro drift
-                _gyro_estimate = _ins.get_gyro(primary_imu) + _gyro_drift;
+                // 使用与主EKF相同的IMU并校正陀螺漂移
+                _gyro_estimate = _ins.get_gyro(primary_imu) + _gyro_drift;//估计值 = 测量值 - 偏差
             }
 
             // get z accel bias estimate from active EKF (this is usually for the primary IMU)
+            // 从活跃EKF获得z加速度偏差估计值（这通常适用于主IMU）
             float abias = 0;
             EKF2.getAccelZBias(-1,abias);
 
             // This EKF is currently using primary_imu, and abias applies to only that IMU
+            // 该EKF目前使用的是主imu，偏差仅适用于该imu
             for (uint8_t i=0; i<_ins.get_accel_count(); i++) {
                 Vector3f accel = _ins.get_accel(i);
                 if (i == primary_imu) {
@@ -234,7 +240,7 @@ void AP_AHRS_NavEKF::update_EKF2(void)
             nav_filter_status filt_state;
             EKF2.getFilterStatus(-1,filt_state);
             AP_Notify::flags.gps_fusion = filt_state.flags.using_gps; // Drives AP_Notify flag for usable GPS.
-            AP_Notify::flags.gps_glitching = filt_state.flags.gps_glitching;
+            AP_Notify::flags.gps_glitching = filt_state.flags.gps_glitching;//驱动可用GPS的AP_通知标志。
             AP_Notify::flags.have_pos_abs = filt_state.flags.horiz_pos_abs;
         }
     }
@@ -394,11 +400,12 @@ const Vector3f &AP_AHRS_NavEKF::get_accel_ef_blended(void) const
 void AP_AHRS_NavEKF::reset(bool recover_eulers)
 {
     // support locked access functions to AHRS data
+    // 支持对AHRS数据的锁定访问功能
     WITH_SEMAPHORE(_rsem);
     
     AP_AHRS_DCM::reset(recover_eulers);//复位DCM
     _dcm_attitude(roll, pitch, yaw);//初始化姿态
-    if (_ekf2_started) {
+    if (_ekf2_started) {/*_ekf2_started == 0，下面不会执行，也就是说这里不初始化EKF滤波器*/
         _ekf2_started = EKF2.InitialiseFilter();//初始化EKF2
     }
     if (_ekf3_started) {
@@ -1433,6 +1440,8 @@ bool AP_AHRS_NavEKF::attitudes_consistent(char *failure_msg, const uint8_t failu
 
 // return the amount of yaw angle change due to the last yaw angle reset in radians
 // returns the time of the last yaw angle reset or 0 if no reset has ever occurred
+/* 返回由于上次偏航角重置而导致的偏航角变化量（以弧度为单位）
+   返回最后一次偏航角重置的时间，如果未进行重置，则返回0*/
 uint32_t AP_AHRS_NavEKF::getLastYawResetAngle(float &yawAng) const
 {
     switch (ekf_type()) {

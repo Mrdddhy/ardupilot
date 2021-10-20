@@ -129,9 +129,9 @@ bool RC_Channel::get_reverse(void) const
 bool RC_Channel::update(void)
 {
     if (has_override() && !rc().ignore_overrides()) {
-        radio_in = override_value;
+        radio_in = override_value;//从MAVLINK消息中得到的
     } else if (!rc().ignore_receiver()) {
-        radio_in = hal.rcin->read(ch_in);//读取遥控器通道的输入
+        radio_in = hal.rcin->read(ch_in);//读取遥控器通道的输入--从后端端口读取
     } else {
         return false;
     }

@@ -22,11 +22,12 @@ void Copter::update_land_and_crash_detectors()
 
 #if PARACHUTE == ENABLED
     // check parachute
+    // 如果检测到严重失控，则解除电机并触发降落伞,如果车辆与目标横滚角和俯仰角持续偏离30度以上，并以主循环速度呼叫1秒，则认为车辆“严重失控”
     parachute_check();
 #endif
 
     crash_check();
-    thrust_loss_check();
+    thrust_loss_check();//检查电机库中的推力损失和触发推力提升
 }
 
 // update_land_detector - checks if we have landed and updates the ap.land_complete flag

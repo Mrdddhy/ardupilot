@@ -314,6 +314,7 @@ Vector2f AP_AHRS::groundspeed_vector(void)
 
 /*
   calculate sin and cos of roll/pitch/yaw from a body_to_ned rotation matrix
+  从机体系到北东地坐标系计算对应的三角函数数值
  */
 void AP_AHRS::calc_trig(const Matrix3f &rot,
                         float &cr, float &cp, float &cy,
@@ -342,7 +343,7 @@ void AP_AHRS::calc_trig(const Matrix3f &rot,
         cp = safe_sqrt(1 - cx2);
         cr = rot.c.z / cp;
     }
-    cp = constrain_float(cp, 0.0f, 1.0f);
+    cp = constrain_float(cp, 0.0f, 1.0f);  //两个判断条件给限制了
     cr = constrain_float(cr, -1.0f, 1.0f); // this relies on constrain_float() of infinity doing the right thing
 
     sp = -rot.c.x;
@@ -355,20 +356,21 @@ void AP_AHRS::calc_trig(const Matrix3f &rot,
         float r, p, y;
         rot.to_euler(&r, &p, &y);
         cr = cosf(r);
-        sr = sinf(r);
+        sr = sinf(r);//矩阵最后一行的关系式
     }
 }
 
 // update_trig - recalculates _cos_roll, _cos_pitch, etc based on latest attitude
 //      should be called after _dcm_matrix is updated
+// 更新三角函数值，应该在_dcm_matrix更新后调用
 void AP_AHRS::update_trig(void)
 {
-    if (_last_trim != _trim.get()) {
+    if (_last_trim != _trim.get()) {//判断一下数值是否更新
         _last_trim = _trim.get();
-        _rotation_autopilot_body_to_vehicle_body.from_euler(_last_trim.x, _last_trim.y, 0.0f);
+        _rotation_autopilot_body_to_vehicle_body.from_euler(_last_trim.x, _last_trim.y, 0.0f);//偏航为0的从机体系到车辆系的旋转矩阵
         _rotation_vehicle_body_to_autopilot_body = _rotation_autopilot_body_to_vehicle_body.transposed();
     }
-
+    //由传入的矩阵进行计算对应的三角函数数值
     calc_trig(get_rotation_body_to_ned(),
               _cos_roll, _cos_pitch, _cos_yaw,
               _sin_roll, _sin_pitch, _sin_yaw);
